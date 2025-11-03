@@ -1,0 +1,331 @@
+print("Player Anims Loaded!")
+
+OutlastAnims = {
+    // Idle and moving anims
+    idle = "player_downed_idle_loop",
+    moveforward = "player_downed_move_forward_3P_nomo",
+    movebackward = "player_downed_move_backward_3P_nomo",
+    moveright = "player_downed_move_right_3P_nomo",
+    moveleft = "player_downed_move_left_3P_nomo",
+
+    // Death
+    downeddeath = "player_downed_bleedout_to_dead",
+
+    // Fall animations depending on direction of hit
+    fallbackward_end = "player_hitreaction_fall_to_downed_backward_end",
+    fallbackward_start_center = "player_hitreaction_fall_to_downed_backward_start_c_nomo",
+    fallbackward_start_left = "player_hitreaction_fall_to_downed_backward_start_l_nomo",
+    fallbackward_start_right = "player_hitreaction_fall_to_downed_backward_start_r_nomo",
+
+    fallforward_end = "player_hitreaction_fall_to_downed_forward_end",
+    fallforward_start_center = "player_hitreaction_fall_to_downed_forward_start_c_nomo",
+    fallforward_start_left = "player_hitreaction_fall_to_downed_forward_start_l_nomo",
+    fallforward_start_right = "player_hitreaction_fall_to_downed_forward_start_r_nomo",
+
+    fallleft_end = "player_hitreaction_fall_to_downed_left_end",
+    fallleft_start_center = "player_hitreaction_fall_to_downed_left_start_c_nomo",
+    fallleft_start_left = "player_hitreaction_fall_to_downed_left_start_l_nomo",
+    fallleft_start_right = "player_hitreaction_fall_to_downed_left_start_r_nomo",
+    
+    fallright_end = "player_hitreaction_fall_to_downed_right_end",
+    fallright_start_center = "player_hitreaction_fall_to_downed_right_start_c_nomo",
+    fallright_start_left = "player_hitreaction_fall_to_downed_right_start_l_nomo",
+    fallright_start_right = "player_hitreaction_fall_to_downed_right_start_r_nomo",
+
+    // Downed getting up animations
+    getup_phase1_back = "player_helpup_follower_entry_back",
+    getup_phase2_back = "player_helpup_follower_try_back",
+    getup_phase3_back = "player_helpup_follower_success_back",
+
+    getup_phase1_front = "player_helpup_follower_entry_front",
+    getup_phase2_front = "player_helpup_follower_try_front",
+    getup_phase3_front = "player_helpup_follower_success_front",
+
+    getup_phase1_left = "player_helpup_follower_entry_left",
+    getup_phase2_left = "player_helpup_follower_try_left",
+    getup_phase3_left = "player_helpup_follower_success_left",
+
+    getup_phase1_right = "player_helpup_follower_entry_right",
+    getup_phase2_right = "player_helpup_follower_try_right",
+    getup_phase3_right = "player_helpup_follower_success_right",
+
+    //Reviver helping up animations
+    helpup_phase1_back = "player_helpup_leader_entry_back",
+    helpup_phase2_back = "player_helpup_leader_try_back",
+    helpup_phase3_back = "player_helpup_leader_success_back",
+
+    helpup_phase1_front = "player_helpup_leader_entry_front",
+    helpup_phase2_front = "player_helpup_leader_try_front",
+    helpup_phase3_front = "player_helpup_leader_success_front",
+
+    helpup_phase1_left = "player_helpup_leader_entry_left",
+    helpup_phase2_left = "player_helpup_leader_try_left",
+    helpup_phase3_left = "player_helpup_leader_success_left",
+
+    helpup_phase1_right = "player_helpup_leader_entry_right",
+    helpup_phase2_right = "player_helpup_leader_try_right",
+    helpup_phase3_right = "player_helpup_leader_success_right",
+}
+
+
+
+function survivor:MovingDirection(threshold)
+    threshold = threshold or 0.1
+    local vel = self:GetVelocity()
+    local forward = self:GetForward()
+    local right = self:GetRight()
+    forward.z = 0
+    right.z = 0
+    forward:Normalize()
+    right:Normalize()
+    local forwardDot = vel:Dot(forward)
+    local rightDot = vel:Dot(right)
+
+    if forwardDot > threshold then
+        return "forward"
+    elseif forwardDot < -threshold then
+        return "backward"
+    end
+
+    if rightDot > threshold then
+        return "right"
+    elseif rightDot < -threshold then
+        return "left"
+    end
+
+    return "stand"
+end
+
+if SERVER then
+    function survivor:SetSVAnimation(anim, autostop)
+        if anim == "" then
+            self:SetNWString("SVAnim", "")
+            self:SetCycle(0)
+            return
+        end
+
+        local seq, dur = self:LookupSequence(anim)
+        if seq == -1 then
+            print("[OutlastAnim] Invalid animation:", anim, "for model:", self:GetModel())
+            return
+        end
+
+        self:SetNWString("SVAnim", anim)
+        self:SetNWFloat("SVAnimDelay", dur)
+        self:SetNWFloat("SVAnimStartTime", CurTime())
+        self:SetCycle(0)
+
+        if autostop then
+            timer.Simple(dur, function()
+                if not IsValid(self) then return end
+                if self:GetNWString("SVAnim") == anim then
+                    self:SetSVAnimation("")
+                end
+            end)
+        end
+    end
+
+    function survivor:IsPlayingSVAnimation()
+        local anim = self:GetNWString("SVAnim", "")
+        return anim != ""
+    end
+
+    function survivor:SetSVMultiAnimation(animTable, autostop)
+        if not istable(animTable) or #animTable == 0 then return end
+
+        -- Usuń poprzednie multi-animacje, jeśli jakieś jeszcze działają
+        if self.SVMultiAnimTimers then
+            for _, timerName in ipairs(self.SVMultiAnimTimers) do
+                if timer.Exists(timerName) then
+                    timer.Remove(timerName)
+                end
+            end
+        end
+        self.SVMultiAnimTimers = {}
+
+        local index = 1
+        local blendTime = 0.15 -- sekundy na płynne przejście
+
+        local function PlayNext()
+            if not IsValid(self) then return end
+            local anim = animTable[index]
+            if not anim then
+                if autostop then
+                    self:SetSVAnimation("") -- zakończ animację
+                end
+                return
+            end
+
+            local seq, dur = self:LookupSequence(anim)
+            if seq == -1 then
+                print("[OutlastAnim] Invalid animation:", anim, "for model:", self:GetModel())
+                index = index + 1
+                PlayNext()
+                return
+            end
+
+            -- Ustaw aktualną animację
+            self:SetSVAnimation(anim, false)
+            self:SetNWBool("SVAnimBlending", true)
+
+            index = index + 1
+
+            -- Czas do rozpoczęcia następnej animacji (trochę wcześniej)
+            local nextDelay = math.max(0, dur - blendTime)
+            local tname = "SVMultiAnim_" .. self:EntIndex() .. "_" .. index
+            table.insert(self.SVMultiAnimTimers, tname)
+
+            timer.Create(tname, nextDelay, 1, function()
+                if not IsValid(self) then return end
+                self:SetNWBool("SVAnimBlending", true)
+                PlayNext()
+
+                -- wyłącz blending po krótkim czasie
+                timer.Simple(blendTime, function()
+                    if IsValid(self) then
+                        self:SetNWBool("SVAnimBlending", false)
+                    end
+                end)
+            end)
+        end
+
+        PlayNext()
+    end
+
+
+
+    function survivor:StopSVMultiAnimation()
+        -- Usuń wszelkie aktywne timery związane z multi-animacjami
+        if self.SVMultiAnimTimers then
+            for _, timerName in ipairs(self.SVMultiAnimTimers) do
+                if timer.Exists(timerName) then
+                    timer.Remove(timerName)
+                end
+            end
+            self.SVMultiAnimTimers = nil
+        end
+
+        -- Wyczyść aktualne informacje o animacji
+        self:SetNWString("SVAnim", "")
+        self:SetNWFloat("SVAnimDelay", 0)
+        self:SetNWFloat("SVAnimStartTime", 0)
+
+        -- Zresetuj cykl animacji
+        self:SetCycle(0)
+    end
+
+
+
+end
+
+hook.Add("CalcMainActivity", "!OutlastTrialsDownedAnimations", function(ply, vel)
+    
+    if ply:IsDowned() and ply:GetNWString("SVAnim", "") == "" then
+
+        if not ply.OutlastAnimCache then
+            ply.OutlastAnimCache = {}
+            for key, seqName in pairs(OutlastAnims) do
+                ply.OutlastAnimCache[key] = ply:LookupSequence(seqName)
+            end
+        end
+
+        local dir = ply:MovingDirection(8)
+        local moving = vel:Length2D() > 10
+        local anims = ply.OutlastAnimCache
+
+        if dir == "forward" and moving then
+            return -1, anims.moveforward
+        elseif dir == "backward" and moving then
+            return -1, anims.movebackward
+        elseif dir == "left" and moving then
+            return -1, anims.moveleft
+        elseif dir == "right" and moving then
+            return -1, anims.moveright
+        else
+            return -1, anims.idle
+        end
+    end
+end)
+
+hook.Add("CalcMainActivity", "OutlastTrialsSVAnimHandler", function(ply, vel)
+    local str = ply:GetNWString('SVAnim')
+    local num = ply:GetNWFloat('SVAnimDelay')
+    local st  = ply:GetNWFloat('SVAnimStartTime')
+    if str != "" and num > 0 then
+        local seq = ply:LookupSequence(str)
+        if seq != -1 then
+            ply:SetCycle(((CurTime() - st) / num) % 1)
+            ply:SetPlaybackRate(1)
+            return -1, seq
+        end
+    end
+end)
+
+hook.Add("UpdateAnimation", "OutlastTrialsDownedPlayback", function(ply, velocity, maxseqgroundspeed)
+    if ply:IsDowned() or ply:IsReviving() then
+        ply:SetPlaybackRate(1) 
+        return true
+    end
+
+    if ply:GetNWBool("SVAnimBlending", false) then
+        ply:SetPlaybackRate(0.5)
+    end
+end)
+
+
+
+hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fov)
+    -- bezpieczeństwo: upewnij się, że mamy poprawnego gracza
+    local viewply = ply
+    if not IsValid(viewply) or not viewply:IsPlayer() then
+        viewply = LocalPlayer()
+        if not IsValid(viewply) or not viewply:IsPlayer() then return end
+    end
+
+    -- BEZPIECZNE SPRAWDZENIE STANÓW: porównujemy do true, żeby nil nie przepuścił
+    local isDowned = (type(viewply.IsDowned) == "function" and viewply:IsDowned() == true) or false
+    local isReviving = (type(viewply.IsReviving) == "function" and viewply:IsReviving() == true) or false
+    local isBeingRevived = (type(viewply.IsBeingRevived) == "function" and viewply:IsBeingRevived() == true) or false
+
+    -- Debug (odkomentuj jeśli chcesz zobaczyć wartości)
+    -- if CLIENT then chat.AddText("[OTR] Downed:", tostring(isDowned), " Reviving:", tostring(isReviving), " BeingRevived:", tostring(isBeingRevived)) end
+
+    -- jeśli żaden ze stanów nie jest true --> używamy domyślnej kamery
+    if not (isDowned or isReviving or isBeingRevived) then
+        return
+    end
+
+    -- dalej: pobierz bone głowy
+    local headBone = viewply:LookupBone("ValveBiped.Bip01_Head1")
+    if not headBone then return end
+
+    local headpos, headang = viewply:GetBonePosition(headBone)
+    if not headpos or not headang then return end
+
+    local newPos = headpos + (headang:Up() * -2.5) + (headang:Forward() * 10)
+
+    local fixedcamtable = {
+        OutlastAnims.getup_phase1_back, OutlastAnims.getup_phase2_back, OutlastAnims.getup_phase3_back,
+        OutlastAnims.getup_phase1_front, OutlastAnims.getup_phase2_front, OutlastAnims.getup_phase3_front,
+        OutlastAnims.getup_phase1_left, OutlastAnims.getup_phase2_left, OutlastAnims.getup_phase3_left,
+        OutlastAnims.getup_phase1_right, OutlastAnims.getup_phase2_right, OutlastAnims.getup_phase3_right,
+        OutlastAnims.helpup_phase1_back, OutlastAnims.helpup_phase2_back, OutlastAnims.helpup_phase3_back,
+        OutlastAnims.helpup_phase1_front, OutlastAnims.helpup_phase2_front, OutlastAnims.helpup_phase3_front,
+        OutlastAnims.helpup_phase1_left, OutlastAnims.helpup_phase2_left, OutlastAnims.helpup_phase3_left,
+        OutlastAnims.helpup_phase1_right, OutlastAnims.helpup_phase2_right, OutlastAnims.helpup_phase3_right,
+        OutlastAnims.downeddeath
+    }
+
+    if table.HasValue(fixedcamtable, viewply:GetNWString("SVAnim", "")) then
+        ang = headang
+    end
+
+    return {
+        origin = newPos,
+        angles = ang,
+        fov = fov,
+        drawviewer = true
+    }
+end)
+
+
