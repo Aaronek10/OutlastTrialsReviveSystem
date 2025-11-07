@@ -26,6 +26,22 @@ function survivor:IsReviving()
     return IsValid(target)
 end
 
+function survivor:GetReviveTarget()
+    local target = self:GetNWEntity("Outlast_RevivingTarget", nil)
+    if IsValid(target) then
+        return target
+    end
+    return nil
+end
+
+hook.Add("SetupMove", "OutlastTrialsReviveSystem_DownedMoveHandler", function(ply, mv, cmd)
+    if not GetConVar("outlasttrials_enabled"):GetBool() then return end
+    if ply:IsDowned() then
+        mv:SetMaxSpeed(15)
+        mv:SetMaxClientSpeed(15)
+    end
+end)
+
 if SERVER then
 
     print("[OUTLAST TRIALS] SERVER System Loaded")
@@ -99,6 +115,97 @@ if SERVER then
         end
     end
 
+    function survivor:SnapToDownedPosition(target, direction, offset)
+        if not IsValid(target) then return end
+
+        offset = offset or 40
+        local approachDir = direction or "front"
+
+        local forward = target:GetForward()
+        local right = target:GetRight()
+        local targetPos = target:GetPos()
+
+        local desiredPos
+        if approachDir == "front" then
+            desiredPos = targetPos + forward * offset
+        elseif approachDir == "back" then
+            desiredPos = targetPos - forward * offset
+        elseif approachDir == "left" then
+            desiredPos = targetPos - right * offset
+        elseif approachDir == "right" then
+            desiredPos = targetPos + right * offset
+        else
+            desiredPos = targetPos + forward * offset
+        end
+
+        -- zachowanie wysokości
+        desiredPos.z = targetPos.z
+
+        -- płynne przejście
+        local currentPos = self:GetPos()
+        local lerpSpeed = FrameTime() * 6
+        local newPos = LerpVector(lerpSpeed, currentPos, desiredPos)
+        self:SetPos(newPos)
+
+        -- obrót w stronę celu
+        local lookAng = (targetPos - self:GetPos()):Angle()
+        lookAng.p = 0
+        self:SetAngles(LerpAngle(FrameTime() * 10, self:GetAngles(), lookAng))
+
+        -- zabezpieczenie przed clippingiem
+        local tr = util.TraceHull({
+            start = self:GetPos(),
+            endpos = self:GetPos(),
+            mins = self:OBBMins() * 0.8,
+            maxs = self:OBBMaxs() * 0.8,
+            filter = self
+        })
+
+        if tr.Hit then
+            -- spróbuj podnieść
+            local newPos = self:GetPos() + Vector(0, 0, 5)
+            local trUp = util.TraceHull({
+                start = newPos,
+                endpos = newPos,
+                mins = self:OBBMins() * 0.8,
+                maxs = self:OBBMaxs() * 0.8,
+                filter = self
+            })
+
+            if not trUp.Hit then
+                self:SetPos(newPos)
+            else
+                -- jeśli dalej koliduje: odepchnij zgodnie z kierunkiem approachDir
+                local dirVec = Vector(0, 0, 0)
+                if approachDir == "front" then
+                    dirVec = forward
+                elseif approachDir == "back" then
+                    dirVec = -forward
+                elseif approachDir == "left" then
+                    dirVec = -right
+                elseif approachDir == "right" then
+                    dirVec = right
+                end
+
+                local pushDir = -dirVec:GetNormalized() * 5
+                local newPos2 = self:GetPos() + pushDir
+                local trBack = util.TraceHull({
+                    start = newPos2,
+                    endpos = newPos2,
+                    mins = self:OBBMins() * 0.8,
+                    maxs = self:OBBMaxs() * 0.8,
+                    filter = self
+                })
+
+                if not trBack.Hit then
+                    self:SetPos(newPos2)
+                end
+            end
+        end
+    end
+
+
+
 
 
     hook.Add("EntityTakeDamage", "OutlastTrialsReviveSystem_DamageDownedHandler", function(ent, dmginfo)
@@ -155,31 +262,25 @@ if SERVER then
         end
     end)
 
-    hook.Add("Move", "OutlastTrialsReviveSystem_DownedMoveHandler", function(ply, mv)
-        if not GetConVar("outlasttrials_enabled"):GetBool() then return end
-        if ply:IsDowned() then
-            mv:SetMaxSpeed(15)
-            mv:SetMaxClientSpeed(15)
-        end
-    end)
-
     hook.Add("Think", "OutlastTrialsReviveSystem_DownedThinkHandler", function()
         if not GetConVar("outlasttrials_enabled"):GetBool() then return end
         for _, ply in pairs(player.GetAll()) do
             if not IsValid(ply) or not ply:Alive() then return end
 
             if not ply.RevivingTarget and ply:KeyPressed(IN_USE) then
-                local tr = ply:GetEyeTrace()
+                local tr = ply:GetEyeTraceNoCursor()
                 local target = tr.Entity
+                PrintMessage(HUD_PRINTTALK, ply:Nick() .. " is looking at " .. tostring(target) .. " to revive. Approach Direction: " .. GetApproachDirection(ply, target))
 
                 if IsValid(target) and target:IsPlayer() and target:IsDowned() then
-                    if tr.HitPos:DistToSqr(ply:GetPos()) < 10000 then 
+                    if target:GetPos():DistToSqr(ply:GetPos()) < 10000 then 
                         target:SetNWEntity("Outlast_Reviver", ply)
                         ply:SetNWEntity("Outlast_RevivingTarget", target)
                         target:SetNWFloat("Outlast_ReviveStartTime", CurTime())
                         target:SetNWBool("Outlast_IsBeingRevived", true)
+                        ply.Outlast_UnequipedWeapon = ply:GetActiveWeapon()
+                        ply:SetActiveWeapon(nil)
                         ply.RevivingTarget = target
-                        PrintMessage(HUD_PRINTTALK, ply:Nick() .. " started reviving " .. target:Nick())
                     end
                 end
             end
@@ -192,6 +293,7 @@ if SERVER then
                     local progress = math.Clamp(elapsed / reviveTime, 0, 1)
                     local Direction = GetApproachDirection(ply, ReviveTarget)
                     ReviveTarget:SetReviveProgress(progress)
+                    ply:SnapToDownedPosition(ReviveTarget, Direction, 40)
 
                     if not ply.PlayingReviveAnim and not ReviveTarget.PlayingGetupAnim then
                         if Direction == "front" then
@@ -222,6 +324,7 @@ if SERVER then
                         ply.RevivingTarget = nil
                         ply.PlayingReviveAnim = false
                         ReviveTarget.PlayingGetupAnim = false
+                        ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
                     end
                 else
                     ReviveTarget:SetNWEntity("Outlast_Reviver", NULL)
@@ -233,6 +336,7 @@ if SERVER then
                     ply.RevivingTarget = nil
                     ply.PlayingReviveAnim = false
                     ReviveTarget.PlayingGetupAnim = false
+                    ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
                 end
             end
 

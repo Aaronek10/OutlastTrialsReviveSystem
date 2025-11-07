@@ -3,7 +3,7 @@ print("Player Anims Loaded!")
 OutlastAnims = {
     // Idle and moving anims
     idle = "player_downed_idle_loop",
-    moveforward = "player_downed_move_forward_3P_nomo",
+    moveforward = "player_downed_move_forward_3P_nomo", 
     movebackward = "player_downed_move_backward_3P_nomo",
     moveright = "player_downed_move_right_3P_nomo",
     moveleft = "player_downed_move_left_3P_nomo",
@@ -12,7 +12,7 @@ OutlastAnims = {
     downeddeath = "player_downed_bleedout_to_dead",
 
     // Fall animations depending on direction of hit
-    fallbackward_end = "player_hitreaction_fall_to_downed_backward_end",
+    fallbackward_end = "player_hitreaction_fall_to_downed_backward_end_nomo",
     fallbackward_start_center = "player_hitreaction_fall_to_downed_backward_start_c_nomo",
     fallbackward_start_left = "player_hitreaction_fall_to_downed_backward_start_l_nomo",
     fallbackward_start_right = "player_hitreaction_fall_to_downed_backward_start_r_nomo",
@@ -24,11 +24,11 @@ OutlastAnims = {
 
     fallleft_end = "player_hitreaction_fall_to_downed_left_end",
     fallleft_start_center = "player_hitreaction_fall_to_downed_left_start_c_nomo",
-    fallleft_start_left = "player_hitreaction_fall_to_downed_left_start_l_nomo",
+    fallleft_start_left = "player_hitreaction_fall_to_downed_left_start_l_nomo", 
     fallleft_start_right = "player_hitreaction_fall_to_downed_left_start_r_nomo",
     
     fallright_end = "player_hitreaction_fall_to_downed_right_end",
-    fallright_start_center = "player_hitreaction_fall_to_downed_right_start_c_nomo",
+    fallright_start_center = "player_hitreaction_fall_to_downed_right_start_c_nomo", 
     fallright_start_left = "player_hitreaction_fall_to_downed_right_start_l_nomo",
     fallright_start_right = "player_hitreaction_fall_to_downed_right_start_r_nomo",
 
@@ -52,7 +52,7 @@ OutlastAnims = {
     //Reviver helping up animations
     helpup_phase1_back = "player_helpup_leader_entry_back",
     helpup_phase2_back = "player_helpup_leader_try_back",
-    helpup_phase3_back = "player_helpup_leader_success_back",
+    helpup_phase3_back = "player_helpup_leader_success_back", 
 
     helpup_phase1_front = "player_helpup_leader_entry_front",
     helpup_phase2_front = "player_helpup_leader_try_front",
@@ -202,7 +202,7 @@ if SERVER then
                     timer.Remove(timerName)
                 end
             end
-            self.SVMultiAnimTimers = nil
+            self.SVMultiAnimTimers = nil 
         end
 
         -- Wyczyść aktualne informacje o animacji
@@ -275,34 +275,22 @@ end)
 
 
 hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fov)
-    -- bezpieczeństwo: upewnij się, że mamy poprawnego gracza
     local viewply = ply
     if not IsValid(viewply) or not viewply:IsPlayer() then
         viewply = LocalPlayer()
         if not IsValid(viewply) or not viewply:IsPlayer() then return end
     end
 
-    -- BEZPIECZNE SPRAWDZENIE STANÓW: porównujemy do true, żeby nil nie przepuścił
     local isDowned = (type(viewply.IsDowned) == "function" and viewply:IsDowned() == true) or false
     local isReviving = (type(viewply.IsReviving) == "function" and viewply:IsReviving() == true) or false
     local isBeingRevived = (type(viewply.IsBeingRevived) == "function" and viewply:IsBeingRevived() == true) or false
 
-    -- Debug (odkomentuj jeśli chcesz zobaczyć wartości)
-    -- if CLIENT then chat.AddText("[OTR] Downed:", tostring(isDowned), " Reviving:", tostring(isReviving), " BeingRevived:", tostring(isBeingRevived)) end
-
-    -- jeśli żaden ze stanów nie jest true --> używamy domyślnej kamery
     if not (isDowned or isReviving or isBeingRevived) then
         return
     end
 
-    -- dalej: pobierz bone głowy
-    local headBone = viewply:LookupBone("ValveBiped.Bip01_Head1")
-    if not headBone then return end
-
-    local headpos, headang = viewply:GetBonePosition(headBone)
-    if not headpos or not headang then return end
-
-    local newPos = headpos + (headang:Up() * -2.5) + (headang:Forward() * 10)
+    local attId = viewply:LookupAttachment("cam") 
+	local attLoc = viewply:GetAttachment(attId)
 
     local fixedcamtable = {
         OutlastAnims.getup_phase1_back, OutlastAnims.getup_phase2_back, OutlastAnims.getup_phase3_back,
@@ -321,11 +309,38 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     end
 
     return {
-        origin = newPos,
-        angles = ang,
-        fov = fov,
+        origin = attLoc.Pos + Vector(0,0,-0),
+        angles = attLoc.Ang + Angle(0, 0, -90),
+        fov = 110,
         drawviewer = true
-    }
+    } 
 end)
 
 
+-- local attId = viewply:LookupAttachment("forward")
+	-- local attLoc = viewply:GetAttachment(attId)
+
+    -- local newPos = headpos + (headang:Up() * -2.5) + (headang:Forward() * 10)
+
+    -- local fixedcamtable = {
+        -- OutlastAnims.getup_phase1_back, OutlastAnims.getup_phase2_back, OutlastAnims.getup_phase3_back,
+        -- OutlastAnims.getup_phase1_front, OutlastAnims.getup_phase2_front, OutlastAnims.getup_phase3_front,
+        -- OutlastAnims.getup_phase1_left, OutlastAnims.getup_phase2_left, OutlastAnims.getup_phase3_left,
+        -- OutlastAnims.getup_phase1_right, OutlastAnims.getup_phase2_right, OutlastAnims.getup_phase3_right,
+        -- OutlastAnims.helpup_phase1_back, OutlastAnims.helpup_phase2_back, OutlastAnims.helpup_phase3_back,
+        -- OutlastAnims.helpup_phase1_front, OutlastAnims.helpup_phase2_front, OutlastAnims.helpup_phase3_front,
+        -- OutlastAnims.helpup_phase1_left, OutlastAnims.helpup_phase2_left, OutlastAnims.helpup_phase3_left,
+        -- OutlastAnims.helpup_phase1_right, OutlastAnims.helpup_phase2_right, OutlastAnims.helpup_phase3_right,
+        -- OutlastAnims.downeddeath
+    -- }
+
+    -- if table.HasValue(fixedcamtable, viewply:GetNWString("SVAnim", "")) then
+        -- ang = headang
+    -- end
+
+    -- return {
+        -- origin = attLoc.Pos + Vector(-0,-0,0),
+        -- angles = attLoc.Ang, 
+        -- fov = 110,
+        -- drawviewer = true
+    -- }

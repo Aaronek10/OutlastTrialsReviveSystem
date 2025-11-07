@@ -33,6 +33,9 @@ if CLIENT then
             local progress = timeLeft / totalTime 
             local angle = 360 * progress
 
+            local reviveProgress = ply:GetReviveProgress()
+            local reviveAngle = 360 * reviveProgress
+
             local ringcolor 
             if progress > 0.5 then
                 ringcolor = Color(255, 255, 255)
@@ -45,13 +48,19 @@ if CLIENT then
             local w, h = ScrW(), ScrH()
             local centerX, centerY = w / 2, h / 2
 
-            DrawCircularRing(centerX, centerY, 50, 10, -90, 270, Color(0, 0, 0, 200))
-
-            DrawCircularRing(centerX, centerY, 50, 10, -90, -90 + angle, ringcolor)
-
-            surface.SetMaterial(Material("revive_icon.png"))
-            surface.SetDrawColor(Color(255, 255, 255, 255))
-            surface.DrawTexturedRectRotated(centerX, centerY, 32, 32, 0)
+            if not ply:IsBeingRevived() then
+                DrawCircularRing(centerX, centerY, 50, 10, -90, 270, Color(0, 0, 0, 200))
+                DrawCircularRing(centerX, centerY, 50, 10, -90, -90 + angle, ringcolor)
+                surface.SetMaterial(Material("revive_icon.png"))
+                surface.SetDrawColor(Color(255, 255, 255, 255))
+                surface.DrawTexturedRectRotated(centerX, centerY, 32, 32, 0)
+            else
+                DrawCircularRing(centerX, centerY, 50, 10, -90, 270, Color(0, 0, 0, 200))
+                DrawCircularRing(centerX, centerY, 50, 10, -90, -90 + reviveAngle, Color(0, 132, 255))
+                surface.SetMaterial(Material("revive_icon.png"))
+                surface.SetDrawColor(Color(255,255,255,255))
+                surface.DrawTexturedRectRotated(centerX, centerY, 32, 32, 0)
+            end
         end
 
         local players = player.GetAll()
@@ -103,7 +112,7 @@ if CLIENT then
             local tr = ply:GetEyeTrace()
             if tr.Entity == otherPly and otherPly:IsDowned() and otherPly:Alive() and tr.HitPos:DistToSqr(ply:GetPos()) < 10000 then
                 local name = otherPly:Nick()
-                draw.SimpleTextOutlined("Press E to Revive " .. name, "DermaLarge", ScrW() / 2, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
+                draw.SimpleTextOutlined("Press and hold E to Revive " .. name, "DermaLarge", ScrW() / 2, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
             end
         end
     end)
