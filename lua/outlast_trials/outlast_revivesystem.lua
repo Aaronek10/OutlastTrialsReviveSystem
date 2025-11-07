@@ -138,75 +138,101 @@ if SERVER then
             desiredPos = targetPos + forward * offset
         end
 
-        -- zachowanie wysokości
         desiredPos.z = targetPos.z
 
-        -- płynne przejście
+
         local currentPos = self:GetPos()
         local lerpSpeed = FrameTime() * 6
         local newPos = LerpVector(lerpSpeed, currentPos, desiredPos)
         self:SetPos(newPos)
 
-        -- obrót w stronę celu
+
         local lookAng = (targetPos - self:GetPos()):Angle()
         lookAng.p = 0
         self:SetAngles(LerpAngle(FrameTime() * 10, self:GetAngles(), lookAng))
+        self:SetEyeAngles(lookAng)
+    end
 
-        -- zabezpieczenie przed clippingiem
+    function survivor:ResolvePlayerOverlap(target, minDist, tryBoth)
+        if not IsValid(target) or not IsValid(self) then return false end
+        minDist = minDist or 45
+
+        local posA = self:GetPos()
+        local posB = target:GetPos()
+
+        local delta = posA - posB
+        local dist = delta:Length()
+        if dist >= minDist or dist <= 0.001 then
+            return true
+        end
+
+        local need = minDist - dist
+        local dir = delta:GetNormalized()
+        local moveA = dir * (need * (tryBoth and 0.5 or 1))
+        local moveB = -dir * (need * (tryBoth and 0.5 or 0))
+
+        local desiredA = posA + moveA
+        local mins, maxs = self:OBBMins() * 0.8, self:OBBMaxs() * 0.8
+
         local tr = util.TraceHull({
-            start = self:GetPos(),
-            endpos = self:GetPos(),
-            mins = self:OBBMins() * 0.8,
-            maxs = self:OBBMaxs() * 0.8,
-            filter = self
+            start = posA,
+            endpos = desiredA,
+            mins = mins,
+            maxs = maxs,
+            mask = MASK_PLAYERSOLID,
+            filter = function(ent) if ent == self or ent == target then return false end return true end
         })
 
-        if tr.Hit then
-            -- spróbuj podnieść
-            local newPos = self:GetPos() + Vector(0, 0, 5)
+        if not tr.Hit then
+            local smooth = LerpVector(FrameTime() * 12, posA, desiredA)
+            self:SetPos(smooth)
+        else
+            local upPos = posA + Vector(0,0,16)
             local trUp = util.TraceHull({
-                start = newPos,
-                endpos = newPos,
-                mins = self:OBBMins() * 0.8,
-                maxs = self:OBBMaxs() * 0.8,
-                filter = self
+                start = posA,
+                endpos = upPos,
+                mins = mins,
+                maxs = maxs,
+                mask = MASK_PLAYERSOLID,
+                filter = function(ent) if ent == self or ent == target then return false end return true end
             })
-
             if not trUp.Hit then
-                self:SetPos(newPos)
+                self:SetPos(LerpVector(FrameTime() * 12, posA, upPos))
             else
-                -- jeśli dalej koliduje: odepchnij zgodnie z kierunkiem approachDir
-                local dirVec = Vector(0, 0, 0)
-                if approachDir == "front" then
-                    dirVec = forward
-                elseif approachDir == "back" then
-                    dirVec = -forward
-                elseif approachDir == "left" then
-                    dirVec = -right
-                elseif approachDir == "right" then
-                    dirVec = right
-                end
-
-                local pushDir = -dirVec:GetNormalized() * 5
-                local newPos2 = self:GetPos() + pushDir
-                local trBack = util.TraceHull({
-                    start = newPos2,
-                    endpos = newPos2,
-                    mins = self:OBBMins() * 0.8,
-                    maxs = self:OBBMaxs() * 0.8,
-                    filter = self
+                local side = dir:Cross(Vector(0,0,1)):GetNormalized()
+                local altPos = posA + side * (need + 8)
+                local trAlt = util.TraceHull({
+                    start = posA,
+                    endpos = altPos,
+                    mins = mins,
+                    maxs = maxs,
+                    mask = MASK_PLAYERSOLID,
+                    filter = function(ent) if ent == self or ent == target then return false end return true end
                 })
-
-                if not trBack.Hit then
-                    self:SetPos(newPos2)
+                if not trAlt.Hit then
+                    self:SetPos(LerpVector(FrameTime() * 12, posA, altPos))
                 end
             end
         end
+
+        if tryBoth and IsValid(target) and target.SetPos then
+            local targetDesired = posB + moveB
+            local tr2 = util.TraceHull({
+                start = posB,
+                endpos = targetDesired,
+                mins = target:OBBMins() * 0.8,
+                maxs = target:OBBMaxs() * 0.8,
+                mask = MASK_PLAYERSOLID,
+                filter = function(ent) if ent == self or ent == target then return false end return true end
+            })
+            if not tr2.Hit then
+                local smooth2 = LerpVector(FrameTime() * 12, posB, targetDesired)
+                target:SetPos(smooth2)
+            end
+        end
+
+        return true
     end
-
-
-
-
 
     hook.Add("EntityTakeDamage", "OutlastTrialsReviveSystem_DamageDownedHandler", function(ent, dmginfo)
         if not GetConVar("outlasttrials_enabled"):GetBool() then return end
@@ -293,7 +319,7 @@ if SERVER then
                     local progress = math.Clamp(elapsed / reviveTime, 0, 1)
                     local Direction = GetApproachDirection(ply, ReviveTarget)
                     ReviveTarget:SetReviveProgress(progress)
-                    ply:SnapToDownedPosition(ReviveTarget, Direction, 40)
+                    ply:SnapToDownedPosition(ReviveTarget, Direction, 30)
 
                     if not ply.PlayingReviveAnim and not ReviveTarget.PlayingGetupAnim then
                         if Direction == "front" then
@@ -311,6 +337,10 @@ if SERVER then
                         end
                         ply.PlayingReviveAnim = true
                         ReviveTarget.PlayingGetupAnim = true
+                    end
+
+                    if progress >= 0.9 then
+                        ply:ResolvePlayerOverlap(ReviveTarget, 40, false)
                     end
 
                     if progress >= 1 then
@@ -336,6 +366,7 @@ if SERVER then
                     ply.RevivingTarget = nil
                     ply.PlayingReviveAnim = false
                     ReviveTarget.PlayingGetupAnim = false
+                    ply:ResolvePlayerOverlap(ReviveTarget, 40, false)
                     ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
                 end
             end

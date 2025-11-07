@@ -1,5 +1,5 @@
 print("Player Anims Loaded!")
-
+local survivor = FindMetaTable("Player")
 OutlastAnims = {
     // Idle and moving anims
     idle = "player_downed_idle_loop",
@@ -315,32 +315,3 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
         drawviewer = true
     } 
 end)
-
-
--- local attId = viewply:LookupAttachment("forward")
-	-- local attLoc = viewply:GetAttachment(attId)
-
-    -- local newPos = headpos + (headang:Up() * -2.5) + (headang:Forward() * 10)
-
-    -- local fixedcamtable = {
-        -- OutlastAnims.getup_phase1_back, OutlastAnims.getup_phase2_back, OutlastAnims.getup_phase3_back,
-        -- OutlastAnims.getup_phase1_front, OutlastAnims.getup_phase2_front, OutlastAnims.getup_phase3_front,
-        -- OutlastAnims.getup_phase1_left, OutlastAnims.getup_phase2_left, OutlastAnims.getup_phase3_left,
-        -- OutlastAnims.getup_phase1_right, OutlastAnims.getup_phase2_right, OutlastAnims.getup_phase3_right,
-        -- OutlastAnims.helpup_phase1_back, OutlastAnims.helpup_phase2_back, OutlastAnims.helpup_phase3_back,
-        -- OutlastAnims.helpup_phase1_front, OutlastAnims.helpup_phase2_front, OutlastAnims.helpup_phase3_front,
-        -- OutlastAnims.helpup_phase1_left, OutlastAnims.helpup_phase2_left, OutlastAnims.helpup_phase3_left,
-        -- OutlastAnims.helpup_phase1_right, OutlastAnims.helpup_phase2_right, OutlastAnims.helpup_phase3_right,
-        -- OutlastAnims.downeddeath
-    -- }
-
-    -- if table.HasValue(fixedcamtable, viewply:GetNWString("SVAnim", "")) then
-        -- ang = headang
-    -- end
-
-    -- return {
-        -- origin = attLoc.Pos + Vector(-0,-0,0),
-        -- angles = attLoc.Ang, 
-        -- fov = 110,
-        -- drawviewer = true
-    -- }
