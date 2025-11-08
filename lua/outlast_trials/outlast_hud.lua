@@ -4,6 +4,8 @@ if CLIENT then
     CreateClientConVar("outlasttrials_hud_enabled", "1", true, false, "Enable or disable the Outlast Trials Revive System HUD.")
     CreateClientConVar("outlasttrials_bleedout_ring_enabled", "1", true, false, "Enable or disable the bleedout ring on the HUD.")
 
+
+
     local function DrawCircularRing(centerX, centerY, radius, thickness, angleStart, angleEnd, color)
         surface.SetDrawColor(color)
 
@@ -110,7 +112,7 @@ if CLIENT then
             end
 
             local tr = ply:GetEyeTrace()
-            if tr.Entity == otherPly and otherPly:IsDowned() and otherPly:Alive() and tr.HitPos:DistToSqr(ply:GetPos()) < 10000 then
+            if tr.Entity == otherPly and otherPly:IsDowned() and otherPly:Alive() and tr.HitPos:DistToSqr(ply:GetPos()) < 10000 and not otherPly:IsBeingRevived() then
                 local name = otherPly:Nick()
                 draw.SimpleTextOutlined("Press and hold E to Revive " .. name, "DermaLarge", ScrW() / 2, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
             end
@@ -124,7 +126,7 @@ if CLIENT then
                     DrawCircularRing(ScrW() / 2, ScrH() / 2, 50, 10, -90, -90 + targetReviveAngle, Color(0, 132, 255))
                     surface.SetMaterial(Material("revive_icon.png"))
                     surface.SetDrawColor(Color(255, 255, 255, 255))
-                    surface.DrawTexturedRectRotated(ScrW() / 2, ScrH() / 2, 25, 25, 0)
+                    surface.DrawTexturedRectRotated(ScrW() / 2, ScrH() / 2, 32, 32, 0)
                     draw.SimpleTextOutlined("Reviving: " .. reviveTarget:Nick(), "DermaLarge", ScrW() / 2, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
                 end
             end

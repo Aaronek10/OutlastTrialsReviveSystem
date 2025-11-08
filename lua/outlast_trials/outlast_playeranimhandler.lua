@@ -72,29 +72,31 @@ OutlastAnims = {
 function survivor:MovingDirection(threshold)
     threshold = threshold or 0.1
     local vel = self:GetVelocity()
-    local forward = self:GetForward()
-    local right = self:GetRight()
-    forward.z = 0
-    right.z = 0
+    if vel:Length2D() < threshold then
+        return "stand"
+    end
+
+    local forward = Angle(0, self:EyeAngles().y, 0):Forward()
+    local right = Angle(0, self:EyeAngles().y, 0):Right()
+    forward.z, right.z = 0, 0
     forward:Normalize()
     right:Normalize()
+
     local forwardDot = vel:Dot(forward)
     local rightDot = vel:Dot(right)
 
-    if forwardDot > threshold then
-        return "forward"
-    elseif forwardDot < -threshold then
-        return "backward"
+    local dir
+    if math.abs(forwardDot) > math.abs(rightDot) then
+        dir = (forwardDot > 0) and "forward" or "backward"
+    else
+        dir = (rightDot > 0) and "right" or "left"
     end
+    
+    self.LastMoveDir = dir
 
-    if rightDot > threshold then
-        return "right"
-    elseif rightDot < -threshold then
-        return "left"
-    end
-
-    return "stand"
+    return dir
 end
+
 
 if SERVER then
     function survivor:SetSVAnimation(anim, autostop)
@@ -285,6 +287,9 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     local isReviving = (type(viewply.IsReviving) == "function" and viewply:IsReviving() == true) or false
     local isBeingRevived = (type(viewply.IsBeingRevived) == "function" and viewply:IsBeingRevived() == true) or false
 
+    local PlyAng
+    local PlyOrigin
+
     if not (isDowned or isReviving or isBeingRevived) then
         return
     end
@@ -305,12 +310,18 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     }
 
     if table.HasValue(fixedcamtable, viewply:GetNWString("SVAnim", "")) then
-        ang = headang
+        PlyAng = attLoc.Ang + Angle(0, 0, -90)
+        PlyOrigin = attLoc.Pos + Vector(0,0,-0)
+    else
+        PlyAng = ang
+        PlyOrigin = attLoc.Pos
     end
 
+
+
     return {
-        origin = attLoc.Pos + Vector(0,0,-0),
-        angles = attLoc.Ang + Angle(0, 0, -90),
+        origin = PlyOrigin,
+        angles = PlyAng,
         fov = 110,
         drawviewer = true
     } 

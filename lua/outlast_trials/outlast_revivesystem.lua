@@ -46,23 +46,7 @@ if SERVER then
 
     print("[OUTLAST TRIALS] SERVER System Loaded")
 
-    concommand.Add("outlast_trials_resetflags", function(ply, cmd, args)
-        if IsValid(ply) and not ply:IsAdmin() then return end
-
-        for _, p in pairs(player.GetAll()) do
-            p:ResetState()
-            p:StopSVMultiAnimation()
-            p:SetNWEntity("Outlast_Reviver", NULL)
-            p:SetNWEntity("Outlast_RevivingTarget", NULL)
-            p:SetNWFloat("Outlast_ReviveStartTime", 0)
-            p:SetNWBool("Outlast_IsBeingRevived", false)
-            ply.RevivingTarget = nil
-            ply.PlayingReviveAnim = false
-            p.PlayingGetupAnim = false
-        end
-
-        print("[Outlast Trials] All player downed states have been reset.")
-    end)
+    util.AddNetworkString("OutlastTrialsReviveSystem_NotifyDowned")
 
     function survivor:SetDownedState(state)
         self:SetNWBool("Outlast_IsDowned", state)
@@ -93,6 +77,26 @@ if SERVER then
         self:SetDownedState(true)
         self:SetBleedoutTime(CurTime() + GetConVar("outlasttrials_bleedout_time"):GetFloat())
         self:SetHealth(100)
+    end
+
+    function ResetOutlastReviveFlags(reviver, downed)
+        //Setting Entities to NULL
+        downed:SetNWEntity("Outlast_Reviver", NULL)
+        reviver:SetNWEntity("Outlast_RevivingTarget", NULL)
+
+        //Resetting time and bool
+        downed:SetNWFloat("Outlast_ReviveStartTime", nil)
+        downed:SetNWBool("Outlast_IsBeingRevived", false)
+
+        //Stopping animations
+        reviver:StopSVMultiAnimation()
+        downed:StopSVMultiAnimation()
+
+        //Resetting server flags
+        reviver.RevivingTarget = nil
+        reviver.PlayingReviveAnim = false
+        reviver.ReviveSnapped = false
+        downed.PlayingGetupAnim = false
     end
 
     local function GetApproachDirection(reviver, downed)
@@ -131,7 +135,7 @@ if SERVER then
         elseif approachDir == "back" then
             desiredPos = targetPos - forward * offset
         elseif approachDir == "left" then
-            desiredPos = targetPos - right * offset
+            desiredPos = targetPos - right * offset 
         elseif approachDir == "right" then
             desiredPos = targetPos + right * offset
         else
@@ -238,6 +242,7 @@ if SERVER then
         if not GetConVar("outlasttrials_enabled"):GetBool() then return end
         if not ent:IsPlayer() then return end
         local ply = ent
+        if not ply:Alive() then return end
         local damage = dmginfo:GetDamage()
 
         if not ply:IsDowned() and damage >= ply:Health() then
@@ -247,16 +252,9 @@ if SERVER then
         end
 
         local timeleft = ply:GetBleedoutTime()
-        if ply:IsDowned() then
+        if ply:IsDowned() and timeleft > 0 then
             return true
         end
-
-        if not ply:Alive() then return end
-        if ply._OTRS_IsGettingDowned then return end
-        ply._OTRS_IsGettingDowned = true
-        timer.Simple(0, function()
-            if IsValid(ply) then ply._OTRS_IsGettingDowned = false end
-        end)
     end)
 
     hook.Add("Think", "OutlastTrialsReviveSystem_Think", function()
@@ -267,10 +265,12 @@ if SERVER then
                 if timeLeft <= 0 then
                     if not ply.PlayingDeathAnim then
                         ply:SetSVAnimation(OutlastAnims.downeddeath, true)
+                        ply:Freeze(true)
                         timer.Simple(3, function()
                             if IsValid(ply) then
                                 ply:SetPos(ply:GetPos() + Vector(0,0,5))
-                                ply:Kill()
+                                ply:TakeDamage(ply:Health(), ply.DamageOwner or game.GetWorld(), nil)
+                                ply:Freeze(false)
                                 ply.PlayingDeathAnim = false
                             end
                         end)
@@ -286,6 +286,7 @@ if SERVER then
         if ply:IsDowned() then
             ply:ResetState()
         end
+        ply.DamageOwner = nil
     end)
 
     hook.Add("Think", "OutlastTrialsReviveSystem_DownedThinkHandler", function()
@@ -293,10 +294,10 @@ if SERVER then
         for _, ply in pairs(player.GetAll()) do
             if not IsValid(ply) or not ply:Alive() then return end
 
-            if not ply.RevivingTarget and ply:KeyPressed(IN_USE) then
+            if not ply.RevivingTarget and ply:KeyPressed(IN_USE) and not ply:IsDowned() then
                 local tr = ply:GetEyeTraceNoCursor()
                 local target = tr.Entity
-                PrintMessage(HUD_PRINTTALK, ply:Nick() .. " is looking at " .. tostring(target) .. " to revive. Approach Direction: " .. GetApproachDirection(ply, target))
+                --PrintMessage(HUD_PRINTTALK, ply:Nick() .. " is looking at " .. tostring(target) .. " to revive. Approach Direction: " .. GetApproachDirection(ply, target))
 
                 if IsValid(target) and target:IsPlayer() and target:IsDowned() then
                     if target:GetPos():DistToSqr(ply:GetPos()) < 10000 then 
@@ -319,7 +320,6 @@ if SERVER then
                     local progress = math.Clamp(elapsed / reviveTime, 0, 1)
                     local Direction = GetApproachDirection(ply, ReviveTarget)
                     ReviveTarget:SetReviveProgress(progress)
-                    ply:SnapToDownedPosition(ReviveTarget, Direction, 30)
 
                     if not ply.PlayingReviveAnim and not ReviveTarget.PlayingGetupAnim then
                         if Direction == "front" then
@@ -339,33 +339,31 @@ if SERVER then
                         ReviveTarget.PlayingGetupAnim = true
                     end
 
+                    //Snapping only at the start of the revive (when progress is below 10%)
+                    if progress <= 0.1 then
+                        if Direction == "front" then
+                            ply:SnapToDownedPosition(ReviveTarget, "front", 40)
+                        elseif Direction == "back" then
+                            ply:SnapToDownedPosition(ReviveTarget, "back", 55)
+                        elseif Direction == "left" then
+                            ply:SnapToDownedPosition(ReviveTarget, "left", 45)
+                        elseif Direction == "right" then
+                            ply:SnapToDownedPosition(ReviveTarget, "right", 45)
+                        end
+                    end
+
+                    //Resolve overlap when close to finishing the revive, so players don't get stuck inside each other
                     if progress >= 0.9 then
-                        ply:ResolvePlayerOverlap(ReviveTarget, 40, false)
+                        ply:ResolvePlayerOverlap(ReviveTarget, 45, false)
                     end
 
                     if progress >= 1 then
                         ReviveTarget:Revive()
-                        ReviveTarget:SetNWEntity("Outlast_Reviver", NULL)
-                        ply:SetNWEntity("Outlast_RevivingTarget", NULL)
-                        ReviveTarget:SetNWFloat("Outlast_ReviveStartTime", nil)
-                        ReviveTarget:SetNWBool("Outlast_IsBeingRevived", false)
-                        ply:StopSVMultiAnimation()
-                        ReviveTarget:StopSVMultiAnimation()
-                        ply.RevivingTarget = nil
-                        ply.PlayingReviveAnim = false
-                        ReviveTarget.PlayingGetupAnim = false
+                        ResetOutlastReviveFlags(ply, ReviveTarget)
                         ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
                     end
                 else
-                    ReviveTarget:SetNWEntity("Outlast_Reviver", NULL)
-                    ply:SetNWEntity("Outlast_RevivingTarget", NULL)
-                    ReviveTarget:SetNWFloat("Outlast_ReviveStartTime", 0)
-                    ReviveTarget:SetNWBool("Outlast_IsBeingRevived", false)
-                    ply:StopSVMultiAnimation()
-                    ReviveTarget:StopSVMultiAnimation()
-                    ply.RevivingTarget = nil
-                    ply.PlayingReviveAnim = false
-                    ReviveTarget.PlayingGetupAnim = false
+                    ResetOutlastReviveFlags(ply, ReviveTarget)
                     ply:ResolvePlayerOverlap(ReviveTarget, 40, false)
                     ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
                 end
@@ -394,6 +392,44 @@ if CLIENT then
             print("Reviving Target: ", revivingTarget:Nick())
         else
             print("Reviving Target: None")
+        end
+    end)
+
+    hook.Add("Think", "OutlastTrialsReviveSystem_ClientThink", function()
+        local downedPlayers = player.GetAll()
+
+        function survivor:SpawnBloodParticle()
+            local pos = self:WorldSpaceCenter()
+            local emitter = ParticleEmitter(pos)
+            if not emitter then return end
+
+            local particle = emitter:Add("decals/blood_gunshot_decalmodel", pos)
+            if particle then
+                particle:SetDieTime(30)            -- znika po 15s
+                particle:SetStartAlpha(255)
+                particle:SetEndAlpha(0)
+                particle:SetStartSize(math.random(12, 24))
+                particle:SetEndSize(0)
+                particle:SetRoll(math.random(0, 360))
+                particle:SetColor(90, 0, 0)
+                particle:SetAirResistance(100)
+                particle:SetGravity(Vector(0, 0, -800))
+                particle:SetCollide(true)
+            end
+
+            emitter:Finish()
+        end
+
+        for _, ply in pairs(downedPlayers) do
+            if ply:IsDowned() and ply:GetVelocity():LengthSqr() > 0 then
+                if not ply.NextBloodParticle then
+                    ply.NextBloodParticle = 0
+                end
+                if CurTime() >= ply.NextBloodParticle then
+                    ply:SpawnBloodParticle()
+                    ply.NextBloodParticle = CurTime() + math.Rand(0.1, 0.3)
+                end
+            end
         end
     end)
 end
