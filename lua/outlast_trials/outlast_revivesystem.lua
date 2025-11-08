@@ -342,11 +342,11 @@ if SERVER then
                     //Snapping only at the start of the revive (when progress is below 10%)
                     if progress <= 0.1 then
                         if Direction == "front" then
-                            ply:SnapToDownedPosition(ReviveTarget, "front", 40)
+                            ply:SnapToDownedPosition(ReviveTarget, "front", 30)
                         elseif Direction == "back" then
                             ply:SnapToDownedPosition(ReviveTarget, "back", 55)
                         elseif Direction == "left" then
-                            ply:SnapToDownedPosition(ReviveTarget, "left", 45)
+                            ply:SnapToDownedPosition(ReviveTarget, "left", 40)
                         elseif Direction == "right" then
                             ply:SnapToDownedPosition(ReviveTarget, "right", 45)
                         end
