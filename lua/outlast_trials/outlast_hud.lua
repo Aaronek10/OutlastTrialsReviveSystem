@@ -1,8 +1,44 @@
 if CLIENT then
+
+    OutlastIcons = {
+        //Transparent icons
+        trans_bleedout = Material("outlast/bleedout.png"),
+        trans_info = Material("outlast/helper.png"),
+        trans_medkit = Material("outlast/item_pharma.png"),
+        trans_skull = Material("outlast/item_skull.png"),
+        trans_plaster = Material("outlast/plaster.png"),
+        trans_hourglass = Material("outlast/sablier.png"),
+        trans_object = Material("outlast/objectif_largepickup.png"),
+        trans_shield = Material("outlast/objectif_zonedefence.png"),
+
+        //Objective icons
+        obj_base = Material("outlast/objectif_base.png"),
+        obj_base2 = Material("outlast/objectif_base_02.png"),
+        obj_base3 = Material("outlast/objectif_base_03.png"),
+        obj_base4 = Material("outlast/objectif_base_04.png"),
+
+        //States
+        state_revive = Material("outlast/state_revive.png"),
+        state_bleedout = Material("outlast/state_bleedout.png"),
+        state_execution = Material("outlast/state_execution.png"),
+        state_helping = Material("outlast/state_helping.png"),
+        state_indanger = Material("outlast/state_indanger.png"),
+        state_lowhealth = Material("outlast/state_lowhealth.png"),
+        state_dead = Material("outlast/state_dead.png"),
+        state_coop = Material("outlast/state_coop.png"),
+        state_syringe = Material("outlast/state_syringe.png"),
+
+        //Marker
+        obj_ping = Material("outlast/objective_ping.png"),
+        obj_markup = Material("outlast/objectif_generic.png"),
+        obj_exit = Material("outlast/objectif_exit.png"),
+        obj_arrow = Material("outlast/objectif_arrow.png")
+    }
     print("[OTRS] HUD System Loaded")
 
     CreateClientConVar("outlasttrials_hud_enabled", "1", true, false, "Enable or disable the Outlast Trials Revive System HUD.")
     CreateClientConVar("outlasttrials_bleedout_ring_enabled", "1", true, false, "Enable or disable the bleedout ring on the HUD.")
+    CreateClientConVar("outlasttrials_indicators", 1, true, false, "Show offscreen indicators above downed players.")
 
 
 
@@ -27,6 +63,12 @@ if CLIENT then
 
     hook.Add("HUDPaint", "OutlastTrialsReviveSystem_HUD", function()
         local ply = LocalPlayer()
+        local reviveColor = Color(21, 255, 0)
+        local MidX = ScrW() / 2
+        local MidY = ScrW() / 2
+        local margin = 50
+        local iconMargin = 40
+        local Radius = math.max(ScrW(), ScrH())
         if ply:IsDowned() then
 
             local totalTime = GetConVar("outlasttrials_bleedout_time"):GetFloat()
@@ -53,15 +95,19 @@ if CLIENT then
             if not ply:IsBeingRevived() then
                 DrawCircularRing(centerX, centerY, 50, 10, -90, 270, Color(0, 0, 0, 200))
                 DrawCircularRing(centerX, centerY, 50, 10, -90, -90 + angle, ringcolor)
-                surface.SetMaterial(Material("revive_icon.png"))
+                if timeLeft <= 0 then
+                    surface.SetMaterial(OutlastIcons.state_dead)
+                else
+                    surface.SetMaterial(OutlastIcons.state_bleedout)
+                end
                 surface.SetDrawColor(Color(255, 255, 255, 255))
-                surface.DrawTexturedRectRotated(centerX, centerY, 32, 32, 0)
+                surface.DrawTexturedRectRotated(centerX, centerY, 50, 50, 0)
             else
                 DrawCircularRing(centerX, centerY, 50, 10, -90, 270, Color(0, 0, 0, 200))
-                DrawCircularRing(centerX, centerY, 50, 10, -90, -90 + reviveAngle, Color(0, 132, 255))
-                surface.SetMaterial(Material("revive_icon.png"))
+                DrawCircularRing(centerX, centerY, 50, 10, -90, -90 + reviveAngle, reviveColor)
+                surface.SetMaterial(OutlastIcons.state_revive)
                 surface.SetDrawColor(Color(255,255,255,255))
-                surface.DrawTexturedRectRotated(centerX, centerY, 32, 32, 0)
+                surface.DrawTexturedRectRotated(centerX, centerY, 50, 50, 0)
             end
         end
 
@@ -99,15 +145,69 @@ if CLIENT then
                 if not otherPly:IsBeingRevived() then
                     DrawCircularRing(screenX, screenY, 30, 5, -90, 270, Color(0, 0, 0, 200))
                     DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + plyangle, ringcolor)
-                    surface.SetMaterial(Material("revive_icon.png"))
+                    if plytimeLeft <= 0 then
+                        surface.SetMaterial(OutlastIcons.state_dead)
+                    else
+                        surface.SetMaterial(OutlastIcons.state_bleedout)
+                    end
                     surface.SetDrawColor(Color(255, 255, 255, 255))
-                    surface.DrawTexturedRectRotated(screenX, screenY, 25, 25, 0)
+                    surface.DrawTexturedRectRotated(screenX, screenY, 50, 50, 0)
                 else
                     DrawCircularRing(screenX, screenY, 30, 5, -90, 270, Color(0, 0, 0, 200))
-                    DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + reviveCirleAngle, Color(0, 132, 255))
-                    surface.SetMaterial(Material("revive_icon.png"))
+                    DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + reviveCirleAngle, reviveColor)
+                    surface.SetMaterial(OutlastIcons.state_revive)
                     surface.SetDrawColor(Color(255, 255, 255, 255))
-                    surface.DrawTexturedRectRotated(screenX, screenY, 25, 25, 0)
+                    surface.DrawTexturedRectRotated(screenX, screenY, 50, 50, 0)
+                end
+
+
+                if GetConVar("outlasttrials_indicators"):GetBool() then
+                    local OnScreenDowned = math.atan2(screenY - MidY, screenX - MidX)
+                    local IndicatorX = MidX + math.cos(OnScreenDowned) * Radius
+                    local IndicatorY = MidY + math.sin(OnScreenDowned) * Radius
+                    local RotationTowards = math.NormalizeAngle(0 - math.deg( OnScreenDowned)) - 90
+                    if math.abs(math.cos(OnScreenDowned)) * Radius > math.abs(math.sin(OnScreenDowned)) * Radius then
+                        IndicatorX = math.Clamp(IndicatorX, margin, ScrW() - margin)
+                        IndicatorY = MidY + math.sin(OnScreenDowned) * ((IndicatorX - MidX) / math.cos(OnScreenDowned))
+                    else
+                        IndicatorY = math.Clamp(IndicatorY, margin, ScrH() - margin)
+                        IndicatorX = MidX + math.cos(OnScreenDowned) * ((IndicatorY - MidY) / math.sin(OnScreenDowned))
+                    end
+
+                    local ClampedX = math.Clamp(IndicatorX, margin, ScrW() - margin)
+                    local ClampedY = math.Clamp(IndicatorY, margin, ScrH() - margin)
+                                                
+                    if IndicatorX ~= ClampedX then
+                        IndicatorX = ClampedX
+                        IndicatorY = MidY + math.sin(OnScreenDowned) * ((IndicatorX - MidX) / math.cos(OnScreenDowned))
+                    end
+                                            
+                    if IndicatorY ~= ClampedY then
+                        IndicatorY = ClampedY
+                        IndicatorX = MidX + math.cos(OnScreenDowned) * ((IndicatorY - MidY) / math.sin(OnScreenDowned))
+                    end
+
+                    IndicatorX = math.Clamp(IndicatorX, margin, ScrW() - margin)
+                    IndicatorY = math.Clamp(IndicatorY, margin, ScrH() - margin)
+                    local IconIndicatorX = IndicatorX - math.cos(OnScreenDowned) * iconMargin
+                    local IconIndicatorY = IndicatorY - math.sin(OnScreenDowned) * iconMargin
+
+                    if (screenX < 0 or screenX > ScrW() or screenY < 0 or screenY > ScrH()) then
+                        surface.SetMaterial(OutlastIcons.obj_arrow)
+                        surface.SetDrawColor(Color(255,255,255))
+                        surface.DrawTexturedRectRotated(IndicatorX, IndicatorY, 30, 30, RotationTowards - 180)
+                        if otherPly:IsDowned() then
+                            if plytimeLeft <= 0 then
+                                surface.SetMaterial(OutlastIcons.state_dead)
+                            elseif otherPly:IsBeingRevived() then
+                                surface.SetMaterial(OutlastIcons.state_revive)
+                            else
+                                surface.SetMaterial(OutlastIcons.state_bleedout)
+                            end
+                            surface.SetDrawColor(Color(255, 255, 255, 255))
+                            surface.DrawTexturedRectRotated(IconIndicatorX, IconIndicatorY, 50, 50, 0)
+                        end
+                    end
                 end
             end
 
@@ -123,10 +223,10 @@ if CLIENT then
                 local targetReviveAngle = 360 * targetReviveProgress 
                 if reviveTarget == otherPly then
                     DrawCircularRing(ScrW() / 2, ScrH() / 2, 50, 10, -90, 270, Color(0, 0, 0, 200))
-                    DrawCircularRing(ScrW() / 2, ScrH() / 2, 50, 10, -90, -90 + targetReviveAngle, Color(0, 132, 255))
-                    surface.SetMaterial(Material("revive_icon.png"))
+                    DrawCircularRing(ScrW() / 2, ScrH() / 2, 50, 10, -90, -90 + targetReviveAngle, reviveColor)
+                    surface.SetMaterial(OutlastIcons.state_revive)
                     surface.SetDrawColor(Color(255, 255, 255, 255))
-                    surface.DrawTexturedRectRotated(ScrW() / 2, ScrH() / 2, 32, 32, 0)
+                    surface.DrawTexturedRectRotated(ScrW() / 2, ScrH() / 2, 50, 50, 0)
                     draw.SimpleTextOutlined("Reviving: " .. reviveTarget:Nick(), "DermaLarge", ScrW() / 2, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
                 end
             end

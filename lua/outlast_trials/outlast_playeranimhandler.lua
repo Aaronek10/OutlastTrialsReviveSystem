@@ -283,19 +283,17 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
         if not IsValid(viewply) or not viewply:IsPlayer() then return end
     end
 
-    local isDowned = (type(viewply.IsDowned) == "function" and viewply:IsDowned() == true) or false
-    local isReviving = (type(viewply.IsReviving) == "function" and viewply:IsReviving() == true) or false
-    local isBeingRevived = (type(viewply.IsBeingRevived) == "function" and viewply:IsBeingRevived() == true) or false
+    local isDowned = (type(viewply.IsDowned) == "function" and viewply:IsDowned())
+    local isReviving = (type(viewply.IsReviving) == "function" and viewply:IsReviving())
+    local isBeingRevived = (type(viewply.IsBeingRevived) == "function" and viewply:IsBeingRevived())
 
-    local PlyAng
-    local PlyOrigin
+    if not (isDowned or isReviving or isBeingRevived) then return end
 
-    if not (isDowned or isReviving or isBeingRevived) then
-        return
-    end
+    local attId = viewply:LookupAttachment("cam")
+    local attLoc = viewply:GetAttachment(attId)
+    if not attLoc then return end
 
-    local attId = viewply:LookupAttachment("cam") 
-	local attLoc = viewply:GetAttachment(attId)
+    local ReviveProgress = viewply:GetReviveProgress()
 
     local fixedcamtable = {
         OutlastAnims.getup_phase1_back, OutlastAnims.getup_phase2_back, OutlastAnims.getup_phase3_back,
@@ -309,20 +307,32 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
         OutlastAnims.downeddeath
     }
 
+    local PlyOrigin, PlyAng
+
     if table.HasValue(fixedcamtable, viewply:GetNWString("SVAnim", "")) then
         PlyAng = attLoc.Ang + Angle(0, 0, -90)
-        PlyOrigin = attLoc.Pos + Vector(0,0,-0)
+        PlyOrigin = attLoc.Pos
+        if ReviveProgress > 0.8 and isDowned then
+            local t = math.Clamp((ReviveProgress - 0.8) / 0.2, 0, 1)
+            local targetPos = viewply:EyePos()
+            local targetAng = viewply:EyeAngles()
+
+            PlyOrigin = LerpVector(t, PlyOrigin, targetPos)
+            PlyAng = LerpAngle(t, PlyAng, targetAng)
+            --chat.AddText("Lerping! Player Flags: Downed: " .. tostring(isDowned) .. " isReviving: " .. tostring(isReviving) .. " isBeingRevived: " .. tostring(isBeingRevived))
+        end
+        --chat.AddText("Doing FIXED animation! Using calc.")
     else
         PlyAng = ang
         PlyOrigin = attLoc.Pos
+        --chat.AddText("Crawling or not doing fixed anim.")
     end
-
-
 
     return {
         origin = PlyOrigin,
         angles = PlyAng,
         fov = 110,
         drawviewer = true
-    } 
+    }
 end)
+

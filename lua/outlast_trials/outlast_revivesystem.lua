@@ -79,6 +79,17 @@ if SERVER then
         self:SetHealth(100)
     end
 
+    function survivor:HandleDownWhenReviving(target)
+        target:SetNWEntity("Outlast_Reviver", NULL)
+        self:SetNWEntity("Outlast_RevivingTarget", NULL)
+        target:SetNWFloat("Outlast_ReviveStartTime", nil)
+        target:SetNWBool("Outlast_IsBeingRevived", false)
+        self.RevivingTarget = nil
+
+        self:StopSVMultiAnimation()
+        target:StopSVMultiAnimation()
+    end
+
     function ResetOutlastReviveFlags(reviver, downed)
         //Setting Entities to NULL
         downed:SetNWEntity("Outlast_Reviver", NULL)
@@ -261,8 +272,13 @@ if SERVER then
         if not GetConVar("outlasttrials_enabled"):GetBool() then return end
         for _, ply in pairs(player.GetAll()) do
             if ply:IsDowned() then
+
+                if IsValid(ply:GetReviveTarget()) then
+                    ply:HandleDownWhenReviving(ply:GetReviveTarget())
+                end
+
                 local timeLeft = ply:GetBleedoutTime()
-                if timeLeft <= 0 then
+                if timeLeft <= 0 and not ply:IsBeingRevived() then
                     if not ply.PlayingDeathAnim then
                         ply:SetSVAnimation(OutlastAnims.downeddeath, true)
                         ply:Freeze(true)
@@ -299,7 +315,7 @@ if SERVER then
                 local target = tr.Entity
                 --PrintMessage(HUD_PRINTTALK, ply:Nick() .. " is looking at " .. tostring(target) .. " to revive. Approach Direction: " .. GetApproachDirection(ply, target))
 
-                if IsValid(target) and target:IsPlayer() and target:IsDowned() then
+                if IsValid(target) and target:IsPlayer() and target:IsDowned() and not (target:GetBleedoutTime() <= 0) then
                     if target:GetPos():DistToSqr(ply:GetPos()) < 10000 then 
                         target:SetNWEntity("Outlast_Reviver", ply)
                         ply:SetNWEntity("Outlast_RevivingTarget", target)
@@ -399,7 +415,7 @@ if CLIENT then
         local downedPlayers = player.GetAll()
 
         function survivor:SpawnBloodParticle()
-            local pos = self:WorldSpaceCenter()
+            local pos = self:GetBonePosition(self:LookupBone("ValveBiped.Bip01_Spine4") or 0)
             local emitter = ParticleEmitter(pos)
             if not emitter then return end
 
