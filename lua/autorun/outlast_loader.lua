@@ -10,8 +10,7 @@ if SERVER then
         end
     end
 
-    -- Lepiej użyć InitPostEntity, bo Initialize może być za wcześnie
-    hook.Add("InitPostEntity", "OutlastTrials_LoadFiles", function()
+    hook.Add("PreGamemodeLoaded", "OutlastTrials_LoadFiles", function()
         LoadFiles("outlast_trials")
     end)
 
@@ -33,7 +32,7 @@ else
         end
     end
 
-    hook.Add("InitPostEntity", "OutlastTrials_LoadClientFiles", function()
+    hook.Add("PostGamemodeLoaded", "OutlastTrials_LoadClientFiles", function()
         timer.Simple(3, function() LoadClientFiles("outlast_trials") end)
     end)
 

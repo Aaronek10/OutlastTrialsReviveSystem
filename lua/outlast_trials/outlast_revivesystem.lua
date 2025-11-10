@@ -452,20 +452,18 @@ if SERVER then
                         killerseq = OutlastAnims.finisher_right                       
                     end
 
-                    ply.ExecTime = ply:SequenceDuration(seq) + 2.5
+                    ply.ExecTime = ply:SequenceDuration(seq) + 2.75
                     ExecTarget:SetSVAnimation(seq, true)
                     ply:SetSVAnimation(killerseq, true)
                     ply:Freeze(true)
                     ExecTarget:Freeze(true)
                     ply.StartedExecution = true
                 else
-                    -- Tutaj jesteśmy już W TRAKCIE egzekucji
                     if CurTime() - ply.ExecStart >= (ply.ExecTime or 0) then
                         if IsValid(ExecTarget) and ExecTarget:Alive() and ExecTarget:IsDowned() then
                             ExecTarget:TakeDamage(ExecTarget:Health(), ply, ply)
                         end
-
-                        -- czyszczenie po egzekucji
+                        
                         ply:Freeze(false)
                         if IsValid(ExecTarget) then ExecTarget:Freeze(false) end
                         ply.StartedExecution = false

@@ -1,4 +1,4 @@
-print("Player Anims Loaded!")
+print("[Outlast Trials] Animation Handler loaded!")
 local survivor = FindMetaTable("Player")
 OutlastAnims = {
     // Idle and moving anims
