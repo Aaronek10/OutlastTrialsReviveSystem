@@ -461,14 +461,15 @@ if SERVER then
                         killerseq = OutlastAnims.finisher_right                       
                     end
 
-                    ply.ExecTime = ply:SequenceDuration(seq) + 2.75
+                    ply.ExecTime = ply:SequenceDuration(killerseq)
+                    ExecTarget.ExecDeathTime = ExecTarget:SequenceDuration(seq)
                     ExecTarget:SetSVAnimation(seq, true)
                     ply:SetSVAnimation(killerseq, true)
                     ply:Freeze(true)
                     ExecTarget:Freeze(true)
                     ply.StartedExecution = true
                 else
-                    if CurTime() - ply.ExecStart >= (ply.ExecTime or 0) then
+                    if CurTime() - ply.ExecStart >= (ExecTarget.ExecDeathTime or 0) then
                         if IsValid(ExecTarget) and ExecTarget:Alive() and ExecTarget:IsDowned() then
                             ExecTarget:TakeDamage(ExecTarget:Health(), ply, ply)
                         end
@@ -480,6 +481,7 @@ if SERVER then
                         ply.ExecStart = nil
                         ply.ExecDirection = nil
                         ply.ExecTime = nil
+                        ExecTarget.ExecDeathTime = nil
                         if IsValid(ply) then
                             ply:SetNWEntity("Outlast_ImpostorVictim", NULL)
                         end

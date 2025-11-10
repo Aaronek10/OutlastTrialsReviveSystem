@@ -149,6 +149,8 @@ if CLIENT then
                     DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + plyangle, ringcolor)
                     if plytimeLeft <= 0 then
                         surface.SetMaterial(OutlastIcons.state_dead)
+                    elseif otherPly:IsBeingExecuted() then
+                        surface.SetMaterial(OutlastIcons.state_execution)
                     else
                         surface.SetMaterial(OutlastIcons.state_bleedout)
                     end
@@ -203,6 +205,8 @@ if CLIENT then
                                 surface.SetMaterial(OutlastIcons.state_dead)
                             elseif otherPly:IsBeingRevived() then
                                 surface.SetMaterial(OutlastIcons.state_revive)
+                            elseif otherPly:IsBeingExecuted() then
+                                surface.SetMaterial(OutlastIcons.state_execution)
                             else
                                 surface.SetMaterial(OutlastIcons.state_bleedout)
                             end
