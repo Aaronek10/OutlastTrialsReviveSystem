@@ -297,8 +297,9 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     local isDowned = (type(viewply.IsDowned) == "function" and viewply:IsDowned())
     local isReviving = (type(viewply.IsReviving) == "function" and viewply:IsReviving())
     local isBeingRevived = (type(viewply.IsBeingRevived) == "function" and viewply:IsBeingRevived())
+    local isExecuting = (type(viewply.IsExecuting) == "function" and viewply:IsExecuting())
 
-    if not (isDowned or isReviving or isBeingRevived) then return end
+    if not (isDowned or isReviving or isBeingRevived or isExecuting) then return end
 
     local attId = viewply:LookupAttachment("cam")
     local attLoc = viewply:GetAttachment(attId)
@@ -332,13 +333,10 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
 
             PlyOrigin = LerpVector(t, PlyOrigin, targetPos)
             PlyAng = LerpAngle(t, PlyAng, targetAng)
-            --chat.AddText("Lerping! Player Flags: Downed: " .. tostring(isDowned) .. " isReviving: " .. tostring(isReviving) .. " isBeingRevived: " .. tostring(isBeingRevived))
         end
-        --chat.AddText("Doing FIXED animation! Using calc.")
     else
         PlyAng = ang
         PlyOrigin = attLoc.Pos
-        --chat.AddText("Crawling or not doing fixed anim.")
     end
 
     return {

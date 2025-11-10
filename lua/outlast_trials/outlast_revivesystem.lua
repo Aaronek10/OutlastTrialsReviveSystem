@@ -51,6 +51,15 @@ function survivor:IsBeingExecuted()
     end
 end
 
+function survivor:IsExecuting()
+    local victim = self:GetExecutionTarget()
+        if IsValid(victim) then
+        return true 
+    else
+        return false
+    end
+end
+
 hook.Add("SetupMove", "OutlastTrialsReviveSystem_DownedMoveHandler", function(ply, mv, cmd)
     if not GetConVar("outlasttrials_enabled"):GetBool() then return end
     if ply:IsDowned() then

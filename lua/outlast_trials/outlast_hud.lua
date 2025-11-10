@@ -97,6 +97,8 @@ if CLIENT then
                 DrawCircularRing(centerX, centerY, 50, 10, -90, -90 + angle, ringcolor)
                 if timeLeft <= 0 then
                     surface.SetMaterial(OutlastIcons.state_dead)
+                elseif ply:IsBeingExecuted() then
+                    surface.SetMaterial(OutlastIcons.state_execution)
                 else
                     surface.SetMaterial(OutlastIcons.state_bleedout)
                 end
