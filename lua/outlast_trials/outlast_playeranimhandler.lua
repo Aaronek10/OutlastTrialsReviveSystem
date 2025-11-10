@@ -65,6 +65,17 @@ OutlastAnims = {
     helpup_phase1_right = "player_helpup_leader_entry_right",
     helpup_phase2_right = "player_helpup_leader_try_right",
     helpup_phase3_right = "player_helpup_leader_success_right",
+
+    //Impostor finishers
+    finisher_back = "Imposter_PVP_Downed_Murder_01_Back",
+    finisher_front = "Imposter_PVP_Downed_Murder_01_Front",
+    finisher_left = "Imposter_PVP_Downed_Murder_01_Left",
+    finisher_right = "Imposter_PVP_Downed_Murder_01_Right",
+
+    victim_back = "Player_PVP_Downed_Murder_01_Back",
+    victim_front = "Player_PVP_Downed_Murder_01_Front",
+    victim_left = "Player_PVP_Downed_Murder_01_Left",
+    victim_right = "Player_PVP_Downed_Murder_01_Right"
 }
 
 
@@ -304,7 +315,9 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
         OutlastAnims.helpup_phase1_front, OutlastAnims.helpup_phase2_front, OutlastAnims.helpup_phase3_front,
         OutlastAnims.helpup_phase1_left, OutlastAnims.helpup_phase2_left, OutlastAnims.helpup_phase3_left,
         OutlastAnims.helpup_phase1_right, OutlastAnims.helpup_phase2_right, OutlastAnims.helpup_phase3_right,
-        OutlastAnims.downeddeath
+        OutlastAnims.downeddeath, OutlastAnims.finisher_front, OutlastAnims.finisher_back, OutlastAnims.finisher_left,
+        OutlastAnims.finisher_right, OutlastAnims.victim_front, OutlastAnims.victim_back, OutlastAnims.victim_left,
+        OutlastAnims.victim_right
     }
 
     local PlyOrigin, PlyAng

@@ -67,7 +67,7 @@ if CLIENT then
         local MidX = ScrW() / 2
         local MidY = ScrW() / 2
         local margin = 50
-        local iconMargin = 40
+        local iconMargin = 20
         local Radius = math.max(ScrW(), ScrH())
         if ply:IsDowned() then
 
@@ -195,7 +195,7 @@ if CLIENT then
                     if (screenX < 0 or screenX > ScrW() or screenY < 0 or screenY > ScrH()) then
                         surface.SetMaterial(OutlastIcons.obj_arrow)
                         surface.SetDrawColor(Color(255,255,255))
-                        surface.DrawTexturedRectRotated(IndicatorX, IndicatorY, 30, 30, RotationTowards - 180)
+                        surface.DrawTexturedRectRotated(IndicatorX, IndicatorY, 20, 20, RotationTowards - 180)
                         if otherPly:IsDowned() then
                             if plytimeLeft <= 0 then
                                 surface.SetMaterial(OutlastIcons.state_dead)
@@ -205,7 +205,7 @@ if CLIENT then
                                 surface.SetMaterial(OutlastIcons.state_bleedout)
                             end
                             surface.SetDrawColor(Color(255, 255, 255, 255))
-                            surface.DrawTexturedRectRotated(IconIndicatorX, IconIndicatorY, 50, 50, 0)
+                            surface.DrawTexturedRectRotated(IconIndicatorX, IconIndicatorY, 30, 30, 0)
                         end
                     end
                 end
@@ -213,8 +213,22 @@ if CLIENT then
 
             local tr = ply:GetEyeTrace()
             if tr.Entity == otherPly and otherPly:IsDowned() and otherPly:Alive() and tr.HitPos:DistToSqr(ply:GetPos()) < 10000 and not otherPly:IsBeingRevived() then
-                local name = otherPly:Nick()
-                draw.SimpleTextOutlined("Press and hold E to Revive " .. name, "DermaLarge", ScrW() / 2, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
+                --local name = otherPly:Nick()
+                draw.SimpleTextOutlined("[E]", "DermaLarge", ScrW() / 2 - 25, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
+                surface.SetMaterial(OutlastIcons.obj_base2)
+                surface.SetDrawColor(Color(255,255,255))
+                surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 100, 50, 50, 0)
+                surface.SetMaterial(OutlastIcons.trans_medkit)
+                surface.SetDrawColor(Color(255,255,255))
+                surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 100, 25, 25, 0)
+
+                draw.SimpleTextOutlined("[R]", "DermaLarge", ScrW() / 2 - 25, ScrH() / 2 + 150, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
+                surface.SetMaterial(OutlastIcons.obj_base2)
+                surface.SetDrawColor(Color(255,255,255))
+                surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 150, 50, 50, 0)
+                surface.SetMaterial(OutlastIcons.trans_skull)
+                surface.SetDrawColor(Color(255,255,255))
+                surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 150, 25, 25, 0)
             end
 
             if ply:IsReviving() then
@@ -227,7 +241,10 @@ if CLIENT then
                     surface.SetMaterial(OutlastIcons.state_revive)
                     surface.SetDrawColor(Color(255, 255, 255, 255))
                     surface.DrawTexturedRectRotated(ScrW() / 2, ScrH() / 2, 50, 50, 0)
-                    draw.SimpleTextOutlined("Reviving: " .. reviveTarget:Nick(), "DermaLarge", ScrW() / 2, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
+                    surface.SetMaterial(OutlastIcons.state_helping)
+                    surface.SetDrawColor(Color(255,255,255))
+                    surface.DrawTexturedRectRotated(ScrW() / 2 - 50, ScrH() / 2 + 100, 50, 50, 0)
+                    draw.SimpleTextOutlined(reviveTarget:Nick(), "DermaLarge", ScrW() / 2, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
                 end
             end
         end

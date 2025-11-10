@@ -34,6 +34,23 @@ function survivor:GetReviveTarget()
     return nil
 end
 
+function survivor:GetExecutionTarget()
+    return self:GetNWEntity("Outlast_ImpostorVictim")
+end
+
+function survivor:GetExecutionKiller()
+    return self:GetNWEntity("Outlast_Impostor")
+end
+
+function survivor:IsBeingExecuted()
+    local Killer = self:GetExecutionKiller()
+    if IsValid(Killer) then
+        return true 
+    else
+        return false
+    end
+end
+
 hook.Add("SetupMove", "OutlastTrialsReviveSystem_DownedMoveHandler", function(ply, mv, cmd)
     if not GetConVar("outlasttrials_enabled"):GetBool() then return end
     if ply:IsDowned() then
@@ -64,7 +81,8 @@ if SERVER then
         if not self:IsDowned() then return end
         self:SetDownedState(false)
         self:SetBleedoutTime(0)
-        self:SetHealth(100)
+        self:SetHealth(25)
+        self:SetNoTarget(false)
     end
 
     function survivor:ResetState()
@@ -77,6 +95,7 @@ if SERVER then
         self:SetDownedState(true)
         self:SetBleedoutTime(CurTime() + GetConVar("outlasttrials_bleedout_time"):GetFloat())
         self:SetHealth(100)
+        self:SetNoTarget(true)
     end
 
     function survivor:HandleDownWhenReviving(target)
@@ -256,16 +275,19 @@ if SERVER then
         if not ply:Alive() then return end
         local damage = dmginfo:GetDamage()
 
-        if not ply:IsDowned() and damage >= ply:Health() then
+        if damage >= ply:Health() and not ply:IsDowned() then
+            dmginfo:SetDamage(0)
             ply:Down()
             ply.DamageOwner = dmginfo:GetAttacker()
             return true
         end
 
+        --[[
         local timeleft = ply:GetBleedoutTime()
-        if ply:IsDowned() and timeleft > 0 then
+        if (ply:IsDowned() and timeleft > 0) and not ply:IsBeingExecuted() then
             return true
         end
+        ]]--
     end)
 
     hook.Add("Think", "OutlastTrialsReviveSystem_Think", function()
@@ -310,6 +332,7 @@ if SERVER then
         for _, ply in pairs(player.GetAll()) do
             if not IsValid(ply) or not ply:Alive() then return end
 
+            //Reviving Section
             if not ply.RevivingTarget and ply:KeyPressed(IN_USE) and not ply:IsDowned() then
                 local tr = ply:GetEyeTraceNoCursor()
                 local target = tr.Entity
@@ -336,6 +359,7 @@ if SERVER then
                     local progress = math.Clamp(elapsed / reviveTime, 0, 1)
                     local Direction = GetApproachDirection(ply, ReviveTarget)
                     ReviveTarget:SetReviveProgress(progress)
+                    ply:SetEyeAngles(ply:EyeAngles())
 
                     if not ply.PlayingReviveAnim and not ReviveTarget.PlayingGetupAnim then
                         if Direction == "front" then
@@ -387,6 +411,76 @@ if SERVER then
 
             if ply:IsDowned() then
                 ply:SetActiveWeapon(nil)
+            end
+
+            //Executions Section
+            if not ply.ExecTarget and ply:KeyPressed(IN_RELOAD) and not ply:IsDowned() then
+                local tr = ply:GetEyeTraceNoCursor()
+                local target = tr.Entity
+                local ExecDirection = GetApproachDirection(ply, target)
+
+                if IsValid(target) and target:IsPlayer() and target:IsDowned() and not (target:GetBleedoutTime() <= 0) then
+                    if target:GetPos():DistToSqr(ply:GetPos()) < 10000 then
+                        --PrintMessage(HUD_PRINTTALK, ply:Nick() .. " tried killing a: " .. target:Nick())
+                        target:SetNWEntity("Outlast_Impostor", ply)
+                        ply:SetNWEntity("Outlast_ImpostorVictim", target) 
+                        ply.ExecTarget = target
+                        ply.ExecDirection = ExecDirection
+                        ply.ExecStart = CurTime()
+                        ply.StartedExecution = false -- reset na wszelki wypadek
+                    end
+                end
+            end
+
+            local ExecTarget = ply.ExecTarget
+            if ExecTarget and IsValid(ExecTarget) then
+                if not ply.StartedExecution then
+                    local dir = ply.ExecDirection
+                    local seq
+                    local killerseq
+                    if dir == "front" then
+                        seq = OutlastAnims.victim_front
+                        killerseq = OutlastAnims.finisher_front
+                    elseif dir == "back" then
+                        seq = OutlastAnims.victim_back
+                        killerseq = OutlastAnims.finisher_back
+                    elseif dir == "left" then
+                        seq = OutlastAnims.victim_left
+                        killerseq = OutlastAnims.finisher_left                       
+                    elseif dir == "right" then
+                        seq = OutlastAnims.victim_right
+                        killerseq = OutlastAnims.finisher_right                       
+                    end
+
+                    ply.ExecTime = ply:SequenceDuration(seq) + 2.5
+                    ExecTarget:SetSVAnimation(seq, true)
+                    ply:SetSVAnimation(killerseq, true)
+                    ply:Freeze(true)
+                    ExecTarget:Freeze(true)
+                    ply.StartedExecution = true
+                else
+                    -- Tutaj jesteśmy już W TRAKCIE egzekucji
+                    if CurTime() - ply.ExecStart >= (ply.ExecTime or 0) then
+                        if IsValid(ExecTarget) and ExecTarget:Alive() and ExecTarget:IsDowned() then
+                            ExecTarget:TakeDamage(ExecTarget:Health(), ply, ply)
+                        end
+
+                        -- czyszczenie po egzekucji
+                        ply:Freeze(false)
+                        if IsValid(ExecTarget) then ExecTarget:Freeze(false) end
+                        ply.StartedExecution = false
+                        ply.ExecTarget = nil
+                        ply.ExecStart = nil
+                        ply.ExecDirection = nil
+                        ply.ExecTime = nil
+                        if IsValid(ply) then
+                            ply:SetNWEntity("Outlast_ImpostorVictim", NULL)
+                        end
+                        if IsValid(ExecTarget) then
+                            ExecTarget:SetNWEntity("Outlast_Impostor", NULL)
+                        end
+                    end
+                end
             end
         end
     end)

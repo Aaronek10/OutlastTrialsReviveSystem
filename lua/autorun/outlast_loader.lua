@@ -34,7 +34,7 @@ else
     end
 
     hook.Add("InitPostEntity", "OutlastTrials_LoadClientFiles", function()
-        LoadClientFiles("outlast_trials")
+        timer.Simple(3, function() LoadClientFiles("outlast_trials") end)
     end)
 
     concommand.Add("outlast_trials_reload_client", function()
