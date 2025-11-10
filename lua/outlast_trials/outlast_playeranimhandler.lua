@@ -298,12 +298,16 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     local isReviving = (type(viewply.IsReviving) == "function" and viewply:IsReviving())
     local isBeingRevived = (type(viewply.IsBeingRevived) == "function" and viewply:IsBeingRevived())
     local isExecuting = (type(viewply.IsExecuting) == "function" and viewply:IsExecuting())
+    local isBeingExecuted = (type(viewply.IsBeingExecuted) == "function" and viewply:IsBeingExecuted())
 
-    if not (isDowned or isReviving or isBeingRevived or isExecuting) then return end
+    if not (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted) then return end
 
     local attId = viewply:LookupAttachment("cam")
     local attLoc = viewply:GetAttachment(attId)
-    if not attLoc then return end
+    if not attLoc then
+        chat.AddText("attLoc not found. Using Default EyeAngles and Pos.") 
+        return 
+    end
 
     local ReviveProgress = viewply:GetReviveProgress()
 
