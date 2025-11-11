@@ -351,7 +351,7 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     local PlyOrigin, PlyAng
 
     if table.HasValue(fixedcamtable, viewply:GetNWString("SVAnim", "")) then
-        PlyAng = attLoc.Ang + Angle(0, 0, -90)
+        PlyAng = attLoc.Ang + Angle(-0, 0, -0)
         PlyOrigin = attLoc.Pos
         if ReviveProgress > 0.8 and isDowned then
             local t = math.Clamp((ReviveProgress - 0.8) / 0.2, 0, 1)
@@ -369,7 +369,7 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     return {
         origin = PlyOrigin,
         angles = PlyAng,
-        fov = 110,
+        fov = 100,
         drawviewer = true
     }
 end)
