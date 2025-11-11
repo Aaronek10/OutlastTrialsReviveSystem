@@ -22,12 +22,12 @@ function survivor:IsBeingRevived()
 end
 
 function survivor:IsReviving()
-    local target = self:GetNWEntity("Outlast_RevivingTarget", nil)
+    local target = self:GetNWEntity("Outlast_RevivingTarget", NULL)
     return IsValid(target)
 end
 
 function survivor:GetReviveTarget()
-    local target = self:GetNWEntity("Outlast_RevivingTarget", nil)
+    local target = self:GetNWEntity("Outlast_RevivingTarget", NULL)
     if IsValid(target) then
         return target
     end
@@ -35,11 +35,11 @@ function survivor:GetReviveTarget()
 end
 
 function survivor:GetExecutionTarget()
-    return self:GetNWEntity("Outlast_ImpostorVictim")
+    return self:GetNWEntity("Outlast_ImpostorVictim", NULL)
 end
 
 function survivor:GetExecutionKiller()
-    return self:GetNWEntity("Outlast_Impostor")
+    return self:GetNWEntity("Outlast_Impostor", NULL)
 end
 
 function survivor:IsBeingExecuted()
@@ -58,6 +58,10 @@ function survivor:IsExecuting()
     else
         return false
     end
+end
+
+function survivor:IsFallingToDowned() 
+    return self:GetNWBool("Outlast_IsFalling", false)
 end
 
 hook.Add("SetupMove", "OutlastTrialsReviveSystem_DownedMoveHandler", function(ply, mv, cmd)
@@ -113,6 +117,8 @@ if SERVER then
         target:SetNWFloat("Outlast_ReviveStartTime", nil)
         target:SetNWBool("Outlast_IsBeingRevived", false)
         self.RevivingTarget = nil
+        target.IsFallingToDowned = nil 
+        self.IsFallingToDowned = nil
 
         self:StopSVMultiAnimation()
         target:StopSVMultiAnimation()
@@ -277,27 +283,94 @@ if SERVER then
         return true
     end
 
+    function survivor:HandleFallAnimation(damagePos)
+        if not IsValid(self) or not damagePos then return end
+
+        local myPos = self:GetPos() + Vector(0, 0, 40)
+        local dir = (damagePos - myPos):GetNormalized()
+
+        -- Lokalna orientacja gracza
+        local forward = self:GetForward()
+        local right = self:GetRight()
+
+        local forwardDot = forward:Dot(dir)
+        local rightDot = right:Dot(dir)
+
+        local mainDir
+        if forwardDot > 0.5 then
+            mainDir = "fallbackward"
+        elseif forwardDot < -0.5 then
+            mainDir = "fallforward"
+        elseif rightDot > 0 then
+            mainDir = "fallleft"
+        else
+            mainDir = "fallright"
+        end
+
+        local subDir
+        if math.abs(rightDot) < 0.25 then
+            subDir = "center"
+        elseif rightDot > 0 then
+            subDir = "left"
+        else
+            subDir = "right"
+        end
+
+        local animKey = string.format("%s_start_%s", mainDir, subDir)
+        local animName = OutlastAnims[animKey] or OutlastAnims[mainDir .. "_start_center"]
+        local animEndName = OutlastAnims[mainDir .. "_end"]
+
+        local fallID, fallTime = self:LookupSequence(animName)
+        local fallEndID, fallEndTime = self:LookupSequence(animEndName)
+        local finalTime = fallTime + fallEndTime - 1
+
+        self:SetSVMultiAnimation({animName, animEndName}, true)
+        self:Freeze(true)
+        timer.Create("OutlastAnim_UnfreezeAfterFall" .. self:EntIndex(), finalTime, 1, function()
+            self:Freeze(false)
+        end)
+        return finalTime
+    end
+
+
     hook.Add("EntityTakeDamage", "OutlastTrialsReviveSystem_DamageDownedHandler", function(ent, dmginfo)
         if not GetConVar("outlasttrials_enabled"):GetBool() then return end
         if not ent:IsPlayer() then return end
+
         local ply = ent
         if not ply:Alive() then return end
+
+        local inflictor = dmginfo:GetInflictor()
+        local damagePos = IsValid(inflictor) and inflictor:GetPos() or dmginfo:GetDamagePosition()
+        local attacker = dmginfo:GetAttacker()
         local damage = dmginfo:GetDamage()
 
-        if damage >= ply:Health() and not ply:IsDowned() then
+        -- Gracz ma paść, ale nie jest jeszcze powalony
+        if damage >= ply:Health() and not ply:IsDowned() and not ply.Outlast_IsFallingToDowned then
             dmginfo:SetDamage(0)
-            ply:Down()
-            ply.DamageOwner = dmginfo:GetAttacker()
+            ply.Outlast_IsFallingToDowned = true
+            ply:SetNWBool("Outlast_IsFalling", true)
+            ply.DamageOwner = attacker
+
+            local timetodown = ply:HandleFallAnimation(damagePos) or 1
+
+            timer.Create("OutlastPlayerDownAnim_" .. ply:EntIndex(), timetodown, 1, function()
+                if not IsValid(ply) or not ply:Alive() then return end
+                ply:Down()
+                ply.Outlast_IsFallingToDowned = nil
+                ply:SetNWBool("Outlast_IsFalling", false)
+            end)
+
+            hook.Run("Outlast_PlayerDowned", ply, attacker, inflictor)
             return true
         end
 
-        --[[
-        local timeleft = ply:GetBleedoutTime()
-        if (ply:IsDowned() and timeleft > 0) and not ply:IsBeingExecuted() then
+        -- Blok obrażeń w trakcie animacji upadku
+        if ply.Outlast_IsFallingToDowned then
             return true
         end
-        ]]--
     end)
+
 
     hook.Add("Think", "OutlastTrialsReviveSystem_Think", function()
         if not GetConVar("outlasttrials_enabled"):GetBool() then return end
@@ -410,6 +483,7 @@ if SERVER then
                         ReviveTarget:Revive()
                         ResetOutlastReviveFlags(ply, ReviveTarget)
                         ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
+                        hook.Run("Outlast_PlayerRevived", ply, ReviveTarget)
                     end
                 else
                     ResetOutlastReviveFlags(ply, ReviveTarget)
@@ -437,6 +511,7 @@ if SERVER then
                         ply.ExecDirection = ExecDirection
                         ply.ExecStart = CurTime()
                         ply.StartedExecution = false -- reset na wszelki wypadek
+                        hook.Run("Outlast_PlayerExecuting", ply, target)
                     end
                 end
             end
@@ -491,7 +566,6 @@ if SERVER then
             end
         end
     end)
-
 end
 
 

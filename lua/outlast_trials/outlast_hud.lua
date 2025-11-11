@@ -32,7 +32,10 @@ if CLIENT then
         obj_ping = Material("outlast/objective_ping.png"),
         obj_markup = Material("outlast/objectif_generic.png"),
         obj_exit = Material("outlast/objectif_exit.png"),
-        obj_arrow = Material("outlast/objectif_arrow.png")
+        obj_arrow = Material("outlast/objectif_arrow.png"),
+
+        bloodscreen1 = Material("outlast/vignette_blood.png"),
+        bloodscreen2 = Material("outlast/vignette_blood_02.png")
     }
     print("[OTRS] HUD System Loaded")
 
@@ -111,6 +114,12 @@ if CLIENT then
                 surface.SetDrawColor(Color(255,255,255,255))
                 surface.DrawTexturedRectRotated(centerX, centerY, 50, 50, 0)
             end
+
+            //Blood screen
+            surface.SetMaterial(OutlastIcons.bloodscreen2)
+            surface.SetDrawColor(Color(255,255,255))
+            surface.DrawTexturedRect(0, 0, w, h)
+            surface.DrawTexturedRectUV(0, 0, w, h, 1, 0, 0, 1)
         end
 
         local players = player.GetAll()
@@ -145,6 +154,7 @@ if CLIENT then
                 end
 
                 if not otherPly:IsBeingRevived() then
+                    draw.SimpleText(otherPly:Nick(), "TargetID", screenX, screenY - 50, Color(255,255,255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                     DrawCircularRing(screenX, screenY, 30, 5, -90, 270, Color(0, 0, 0, 200))
                     DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + plyangle, ringcolor)
                     if plytimeLeft <= 0 then
@@ -195,6 +205,7 @@ if CLIENT then
                     IndicatorY = math.Clamp(IndicatorY, margin, ScrH() - margin)
                     local IconIndicatorX = IndicatorX - math.cos(OnScreenDowned) * iconMargin
                     local IconIndicatorY = IndicatorY - math.sin(OnScreenDowned) * iconMargin
+                    
 
                     if (screenX < 0 or screenX > ScrW() or screenY < 0 or screenY > ScrH()) then
                         surface.SetMaterial(OutlastIcons.obj_arrow)

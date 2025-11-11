@@ -12,7 +12,7 @@ OutlastAnims = {
     downeddeath = "player_downed_bleedout_to_dead",
 
     // Fall animations depending on direction of hit
-    fallbackward_end = "player_hitreaction_fall_to_downed_backward_end_nomo",
+    fallbackward_end = "player_hitreaction_fall_to_downed_backward_end",
     fallbackward_start_center = "player_hitreaction_fall_to_downed_backward_start_c_nomo",
     fallbackward_start_left = "player_hitreaction_fall_to_downed_backward_start_l_nomo",
     fallbackward_start_right = "player_hitreaction_fall_to_downed_backward_start_r_nomo",
@@ -299,8 +299,9 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     local isBeingRevived = (type(viewply.IsBeingRevived) == "function" and viewply:IsBeingRevived())
     local isExecuting = (type(viewply.IsExecuting) == "function" and viewply:IsExecuting())
     local isBeingExecuted = (type(viewply.IsBeingExecuted) == "function" and viewply:IsBeingExecuted())
+    local isFalling = (type(viewply.IsFallingToDowned) == "function" and viewply:IsFallingToDowned())
 
-    if not (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted) then return end
+    if not (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted or isFalling) then return end
 
     local attId = viewply:LookupAttachment("cam")
     local attLoc = viewply:GetAttachment(attId)
@@ -312,18 +313,40 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     local ReviveProgress = viewply:GetReviveProgress()
 
     local fixedcamtable = {
+        -- Get-up animations
         OutlastAnims.getup_phase1_back, OutlastAnims.getup_phase2_back, OutlastAnims.getup_phase3_back,
         OutlastAnims.getup_phase1_front, OutlastAnims.getup_phase2_front, OutlastAnims.getup_phase3_front,
         OutlastAnims.getup_phase1_left, OutlastAnims.getup_phase2_left, OutlastAnims.getup_phase3_left,
         OutlastAnims.getup_phase1_right, OutlastAnims.getup_phase2_right, OutlastAnims.getup_phase3_right,
+
+        -- Help-up animations
         OutlastAnims.helpup_phase1_back, OutlastAnims.helpup_phase2_back, OutlastAnims.helpup_phase3_back,
         OutlastAnims.helpup_phase1_front, OutlastAnims.helpup_phase2_front, OutlastAnims.helpup_phase3_front,
         OutlastAnims.helpup_phase1_left, OutlastAnims.helpup_phase2_left, OutlastAnims.helpup_phase3_left,
         OutlastAnims.helpup_phase1_right, OutlastAnims.helpup_phase2_right, OutlastAnims.helpup_phase3_right,
-        OutlastAnims.downeddeath, OutlastAnims.finisher_front, OutlastAnims.finisher_back, OutlastAnims.finisher_left,
-        OutlastAnims.finisher_right, OutlastAnims.victim_front, OutlastAnims.victim_back, OutlastAnims.victim_left,
-        OutlastAnims.victim_right
+
+        -- Fall backward
+        OutlastAnims.fallbackward_start_center, OutlastAnims.fallbackward_start_left, OutlastAnims.fallbackward_start_right,
+        OutlastAnims.fallbackward_end,
+
+        -- Fall forward
+        OutlastAnims.fallforward_start_center, OutlastAnims.fallforward_start_left, OutlastAnims.fallforward_start_right,
+        OutlastAnims.fallforward_end,
+
+        -- Fall left
+        OutlastAnims.fallleft_start_center, OutlastAnims.fallleft_start_left, OutlastAnims.fallleft_start_right,
+        OutlastAnims.fallleft_end,
+
+        -- Fall right
+        OutlastAnims.fallright_start_center, OutlastAnims.fallright_start_left, OutlastAnims.fallright_start_right,
+        OutlastAnims.fallright_end,
+
+        -- Deaths and finishers
+        OutlastAnims.downeddeath,
+        OutlastAnims.finisher_front, OutlastAnims.finisher_back, OutlastAnims.finisher_left, OutlastAnims.finisher_right,
+        OutlastAnims.victim_front, OutlastAnims.victim_back, OutlastAnims.victim_left, OutlastAnims.victim_right
     }
+
 
     local PlyOrigin, PlyAng
 
