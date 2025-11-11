@@ -492,7 +492,7 @@ if SERVER then
                 end
             end
 
-            if ply:IsDowned() then
+            if (ply:IsDowned() or ply.Outlast_IsFallingToDowned) then
                 ply:SetActiveWeapon(nil)
             end
 

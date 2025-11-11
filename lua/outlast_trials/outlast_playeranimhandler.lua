@@ -351,7 +351,7 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     local PlyOrigin, PlyAng
 
     if table.HasValue(fixedcamtable, viewply:GetNWString("SVAnim", "")) then
-        PlyAng = attLoc.Ang + Angle(-0, 0, -0)
+        PlyAng = attLoc.Ang
         PlyOrigin = attLoc.Pos
         if ReviveProgress > 0.8 and isDowned then
             local t = math.Clamp((ReviveProgress - 0.8) / 0.2, 0, 1)
@@ -364,6 +364,26 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     else
         PlyAng = ang
         PlyOrigin = attLoc.Pos
+    end
+
+    local hiddenBones = {
+        "ValveBiped.Bip01_Head1",
+        "ValveBiped.Bip01_Neck1",
+        "ValveBiped.Bip01_Neck",
+        "ValveBiped.Bip01_L_Clavicle",
+        "ValveBiped.Bip01_R_Clavicle",
+    }
+
+    for _, boneName in ipairs(hiddenBones) do
+        local boneId = viewply:LookupBone(boneName)
+        if boneId then
+            if (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted or isFalling) then
+                viewply:ManipulateBoneScale(boneId, Vector(0, 0, 0))
+                timer.Create("LocalPly_returnbonescales_Bone" .. boneId .. "_" .. viewply:Nick(), 1, 1, function()
+                    viewply:ManipulateBoneScale(boneId, Vector(1, 1, 1))
+                end)
+            end
+        end
     end
 
     return {
