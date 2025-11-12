@@ -316,6 +316,15 @@ if SERVER then
             subDir = "right"
         end
 
+        local angafterfall = self:EyeAngles()
+        if mainDir == "fallbackward" then
+            angafterfall.y = angafterfall.y + 180
+        elseif mainDir == "fallleft" then
+           angafterfall.y = angafterfall.y + 90
+        elseif mainDir == "fallright" then
+            angafterfall.y = angafterfall.y - 90
+        end
+
         local animKey = string.format("%s_start_%s", mainDir, subDir)
         local animName = OutlastAnims[animKey] or OutlastAnims[mainDir .. "_start_center"]
         local animEndName = OutlastAnims[mainDir .. "_end"]
@@ -328,6 +337,7 @@ if SERVER then
         self:Freeze(true)
         timer.Create("OutlastAnim_UnfreezeAfterFall" .. self:EntIndex(), finalTime, 1, function()
             self:Freeze(false)
+            self:SetEyeAngles(angafterfall)
         end)
         return finalTime
     end
@@ -511,6 +521,7 @@ if SERVER then
                         ply.ExecDirection = ExecDirection
                         ply.ExecStart = CurTime()
                         ply.StartedExecution = false -- reset na wszelki wypadek
+                        ply.Outlast_UnequipedWeapon = ply:GetActiveWeapon()
                         hook.Run("Outlast_PlayerExecuting", ply, target)
                     end
                 end
@@ -541,8 +552,29 @@ if SERVER then
                     ply:SetSVAnimation(killerseq, true)
                     ply:Freeze(true)
                     ExecTarget:Freeze(true)
+                    ply:SetActiveWeapon(nil)
                     ply.StartedExecution = true
                 else
+                    //Snapping
+                    if CurTime() - ply.ExecStart <= 2 then
+                        local ExecDirection = GetApproachDirection(ply, ExecTarget)
+                        local VictimAngle = (ExecTarget:GetPos() - ply:GetPos()):Angle()
+                        VictimAngle.p = 0
+                        ply:SetEyeAngles(VictimAngle)
+                        ply:SetAngles(VictimAngle)
+
+                        if ExecDirection == "front" then
+                            ply:SnapToDownedPosition(ExecTarget, "front", 40)
+                        elseif ExecDirection == "back" then
+                            ply:SnapToDownedPosition(ExecTarget, "back", 60)
+                        elseif ExecDirection == "left" then
+                            ply:SnapToDownedPosition(ExecTarget, "left", 40)
+                        elseif ExecDirection == "right" then
+                            ply:SnapToDownedPosition(ExecTarget, "right", 40)
+                        end
+
+                    end
+
                     if CurTime() - ply.ExecStart >= (ply.ExecTime or 0) then
                         if IsValid(ExecTarget) and ExecTarget:Alive() and ExecTarget:IsDowned() then
                             ExecTarget:TakeDamage(ExecTarget:Health(), ply, ply)
@@ -555,6 +587,8 @@ if SERVER then
                         ply.ExecStart = nil
                         ply.ExecDirection = nil
                         ply.ExecTime = nil
+                        ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
+                        ply.Outlast_UnequipedWeapon = nil
                         if IsValid(ply) then
                             ply:SetNWEntity("Outlast_ImpostorVictim", NULL)
                         end

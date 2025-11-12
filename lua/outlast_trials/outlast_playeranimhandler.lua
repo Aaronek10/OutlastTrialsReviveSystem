@@ -302,11 +302,10 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     local isFalling = (type(viewply.IsFallingToDowned) == "function" and viewply:IsFallingToDowned())
 
     if not (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted or isFalling) then return end
-
     local attId = viewply:LookupAttachment("cam")
     local attLoc = viewply:GetAttachment(attId)
-    if not attLoc then
-        chat.AddText("attLoc not found. Using Default EyeAngles and Pos.") 
+    if not attId then
+        chat.AddText("attId not found. Using Default EyeAngles and Pos.") 
         return 
     end
 
@@ -393,4 +392,37 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
         drawviewer = true
     }
 end)
+
+if CLIENT then
+    
+    hook.Add("Think", "OutlastTrials_KnifePosition", function()
+        for _, ply in ipairs(player.GetAll()) do
+            if ply:IsExecuting() then
+                -- Stwórz model tylko raz
+                if not IsValid(ply.Outlast_knife) then
+                    ply.Outlast_knife = ClientsideModel("models/weapons/w_knife_t.mdl", RENDERGROUP_OPAQUE)
+                    ply.Outlast_knife:SetNoDraw(false)
+                    ply.Outlast_knife:SetParent(ply)
+                    ply.Outlast_knife:AddEffects(EF_BONEMERGE)
+                end
+
+                local attIndex = ply:LookupAttachment("wpn")
+                if attIndex and attIndex > 0 then
+                    local att = ply:GetAttachment(attIndex)
+                    if att then
+                        ply.Outlast_knife:SetPos(att.Pos)
+                        ply.Outlast_knife:SetAngles(att.Ang)
+                    end
+                end
+            else
+                if IsValid(ply.Outlast_knife) then
+                    ply.Outlast_knife:Remove()
+                    ply.Outlast_knife = nil
+                end
+            end
+        end
+    end)
+
+
+end
 
