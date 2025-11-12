@@ -449,6 +449,7 @@ if SERVER then
         if ply:IsDowned() then
             ply:ResetState()
         end
+        RemoveAllOutlastFlags(ply) 
         ply.DamageOwner = nil
     end)
 
