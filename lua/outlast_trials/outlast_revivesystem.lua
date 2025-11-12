@@ -171,11 +171,10 @@ if SERVER then
     end
 
 
-    function survivor:SnapToDownedPosition(target, direction, offset, adjust)
+    function survivor:SnapToDownedPosition(target, direction, offset)
         if not IsValid(target) then return end
 
         offset = offset or 40
-        adjust = adjust or 0
         local approachDir = direction or "front"
 
         local forward = target:GetForward()
@@ -188,28 +187,27 @@ if SERVER then
         elseif approachDir == "back" then
             desiredPos = targetPos - forward * offset
         elseif approachDir == "left" then
-            desiredPos = targetPos - right * offset
+            desiredPos = targetPos - right * offset 
         elseif approachDir == "right" then
             desiredPos = targetPos + right * offset
         else
             desiredPos = targetPos + forward * offset
         end
 
-        desiredPos = desiredPos + right * adjust
-
         desiredPos.z = targetPos.z
+
 
         local currentPos = self:GetPos()
         local lerpSpeed = FrameTime() * 6
         local newPos = LerpVector(lerpSpeed, currentPos, desiredPos)
         self:SetPos(newPos)
 
+
         local lookAng = (targetPos - self:GetPos()):Angle()
         lookAng.p = 0
         self:SetAngles(LerpAngle(FrameTime() * 10, self:GetAngles(), lookAng))
         self:SetEyeAngles(lookAng)
     end
-
 
     function survivor:ResolvePlayerOverlap(target, minDist, tryBoth)
         if not IsValid(target) or not IsValid(self) then return false end
