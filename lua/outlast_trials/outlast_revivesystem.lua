@@ -144,6 +144,32 @@ if SERVER then
         downed.PlayingGetupAnim = false
     end
 
+    local function RemoveAllOutlastFlags(ply) 
+        ply:SetNWEntity("Outlast_Reviver", NULL)
+        ply:SetNWEntity("Outlast_RevivingTarget", NULL)
+        ply:SetNWFloat("Outlast_ReviveStartTime", nil)
+        ply:SetNWBool("Outlast_IsBeingRevived", false)
+        ply:SetNWBool("Outlast_IsFalling", false)
+        ply:SetNWEntity("Outlast_Impostor", NULL)
+        ply:SetNWEntity("Outlast_ImpostorVictim", NULL) 
+        ply:StopSVMultiAnimation()
+
+        ply.RevivingTarget = nil
+        ply.PlayingReviveAnim = nil
+        ply.ReviveSnapped = nil
+        ply.PlayingGetupAnim = nil
+        ply.Outlast_IsFallingToDowned = nil
+        ply.ExecTarget = nil
+        ply.StartedExecution = nil
+        ply.StartedExecution = false
+        ply.ExecTarget = nil
+        ply.ExecStart = nil
+        ply.ExecDirection = nil
+        ply.ExecTime = nil
+
+        //Something broke? KYS! IT'S THAT SIMPLE!
+    end
+
     local function GetApproachDirection(reviver, downed)
         local toReviver = (reviver:GetPos() - downed:GetPos())
         toReviver.z = 0
