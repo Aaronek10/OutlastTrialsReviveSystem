@@ -145,10 +145,16 @@ if SERVER then
     end
 
     local function GetApproachDirection(reviver, downed)
-        local toReviver = (reviver:GetPos() - downed:GetPos()):GetNormalized()
+        local toReviver = (reviver:GetPos() - downed:GetPos())
+        toReviver.z = 0
+        toReviver:Normalize()
 
-        local forward = downed:EyeAngles():Forward()
-        local right = downed:EyeAngles():Right()
+        local forward = downed:EyeAngles()
+        forward.p, forward.r = 0, 0
+        forward = forward:Forward()
+        local right = downed:EyeAngles()
+        right.p, right.r = 0, 0
+        right = right:Right()
 
         local forwardDot = forward:Dot(toReviver)
         local rightDot = right:Dot(toReviver)
@@ -163,6 +169,7 @@ if SERVER then
             return "left"
         end
     end
+
 
     function survivor:SnapToDownedPosition(target, direction, offset)
         if not IsValid(target) then return end
