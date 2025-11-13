@@ -381,9 +381,10 @@ if SERVER then
 
         self:SetSVMultiAnimation({animName, animEndName}, true)
         self:Freeze(true)
-        timer.Create("OutlastAnim_UnfreezeAfterFall" .. self:EntIndex(), finalTime, 1, function()
+        timer.Create("OutlastAnim_UnfreezeAfterFall" .. self:EntIndex(), finalTime - 1, 1, function()
             self:Freeze(false)
             self:SetEyeAngles(angafterfall)
+            self:SetAngles(angafterfall)
         end)
         return finalTime
     end
