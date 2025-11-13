@@ -406,7 +406,7 @@ if CLIENT then
                     ply.Outlast_knife:AddEffects(EF_BONEMERGE)
                 end
 
-                local attIndex = ply:LookupAttachment("wpn")
+                local attIndex = ply:LookupAttachment("anim_attachment_RH")
                 if attIndex and attIndex > 0 then
                     local att = ply:GetAttachment(attIndex)
                     if att then
