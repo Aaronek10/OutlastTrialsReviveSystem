@@ -197,10 +197,11 @@ if SERVER then
     end
 
 
-    function survivor:SnapToDownedPosition(target, direction, offset)
+    function survivor:SnapToDownedPosition(target, direction, offset, adjust)
         if not IsValid(target) then return end
 
         offset = offset or 40
+        adjust = adjust or 0
         local approachDir = direction or "front"
 
         local forward = target:GetForward()
@@ -220,19 +221,31 @@ if SERVER then
             desiredPos = targetPos + forward * offset
         end
 
+        -- zachowaj wysokość i zastosuj przesunięcie w lewo/prawo względem targetu
         desiredPos.z = targetPos.z
-
+        desiredPos = desiredPos + right * adjust
+        self.OutlastDesiredPos = desiredPos
 
         local currentPos = self:GetPos()
         local lerpSpeed = FrameTime() * 6
-        local newPos = LerpVector(lerpSpeed, currentPos, desiredPos)
+        local newPos = LerpVector(lerpSpeed, currentPos, self.OutlastDesiredPos)
         self:SetPos(newPos)
-
 
         local lookAng = (targetPos - self:GetPos()):Angle()
         lookAng.p = 0
         self:SetAngles(LerpAngle(FrameTime() * 10, self:GetAngles(), lookAng))
         self:SetEyeAngles(lookAng)
+        local tname = "DesiredPosOutlastCleanUp_" .. self:EntIndex()
+        if timer.Exists(tname) then
+            timer.Adjust(tname, 0.1, 1, function()
+                if IsValid(self) then self.OutlastDesiredPos = nil end
+            end)
+            timer.Start(tname)
+        else
+            timer.Create(tname, 0.1, 1, function()
+                if IsValid(self) then self.OutlastDesiredPos = nil end
+            end)
+        end
     end
 
     function survivor:ResolvePlayerOverlap(target, minDist, tryBoth)
