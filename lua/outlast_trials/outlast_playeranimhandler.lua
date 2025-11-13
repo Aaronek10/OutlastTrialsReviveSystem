@@ -400,18 +400,20 @@ if CLIENT then
             if ply:IsExecuting() then
                 -- Stwórz model tylko raz
                 if not IsValid(ply.Outlast_knife) then
-                    ply.Outlast_knife = ClientsideModel("models/weapons/w_knife_t.mdl", RENDERGROUP_OPAQUE)
+                    ply.Outlast_knife = ClientsideModel("models/weapons/execution/w_nmrih_knife.mdl", RENDERGROUP_OPAQUE)
                     ply.Outlast_knife:SetNoDraw(false)
                     ply.Outlast_knife:SetParent(ply)
-                    ply.Outlast_knife:AddEffects(EF_BONEMERGE)
+                    -- ply.Outlast_knife:AddEffects(EF_BONEMERGE)
                 end
 
                 local attIndex = ply:LookupAttachment("anim_attachment_RH")
+				local angOffset = Angle(0, -0, 0) 
+				local PosOffset = Vector(0, 0, 0) 
                 if attIndex and attIndex > 0 then
                     local att = ply:GetAttachment(attIndex)
                     if att then
-                        ply.Outlast_knife:SetPos(att.Pos)
-                        ply.Outlast_knife:SetAngles(att.Ang)
+                        ply.Outlast_knife:SetPos(att.Pos + PosOffset)
+                        ply.Outlast_knife:SetAngles(att.Ang + angOffset)
                     end
                 end
             else
