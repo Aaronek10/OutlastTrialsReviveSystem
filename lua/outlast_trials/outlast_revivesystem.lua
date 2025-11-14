@@ -221,7 +221,6 @@ if SERVER then
             desiredPos = targetPos + forward * offset
         end
 
-        -- zachowaj wysokość i zastosuj przesunięcie w lewo/prawo względem targetu
         desiredPos.z = targetPos.z
         desiredPos = desiredPos + right * adjust
         self.OutlastDesiredPos = desiredPos
@@ -332,7 +331,7 @@ if SERVER then
     function survivor:HandleFallAnimation(damagePos)
         if not IsValid(self) or not damagePos then return end
 
-        local myPos = self:GetPos() + Vector(0, 0, 40)
+        local myPos = self:WorldSpaceCenter()
         local dir = (damagePos - myPos):GetNormalized()
 
         -- Lokalna orientacja gracza
@@ -381,10 +380,12 @@ if SERVER then
 
         self:SetSVMultiAnimation({animName, animEndName}, true)
         self:Freeze(true)
+        self:SetAngles(angafterfall)
+        self:SetEyeAngles(angafterfall)
         timer.Create("OutlastAnim_UnfreezeAfterFall" .. self:EntIndex(), finalTime - 1, 1, function()
-            self:Freeze(false)
-            self:SetEyeAngles(angafterfall)
-            self:SetAngles(angafterfall)
+            if IsValid(self) then
+                self:Freeze(false)
+            end
         end)
         return finalTime
     end
