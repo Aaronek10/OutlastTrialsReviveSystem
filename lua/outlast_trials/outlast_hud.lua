@@ -266,4 +266,17 @@ if CLIENT then
             end
         end
     end)
+
+    hook.Add("StartCommand", "OutlastTrialsReviveSystem_CameraLock", function(ply, ucmd)
+        local ang = ply:GetNWAngle("Outlast_AfterFallAngle", nil)
+        local IsInAnimation = ply:GetNWString("SVAnim") ~= ""
+        --chat.AddText("In animation: " .. tostring(IsInAnimation))
+        if not IsInAnimation then
+            if ang and not ang:IsZero() then
+                ucmd:SetViewAngles(ang)
+                ucmd:SetForwardMove(1000)
+                ply:SetLocalVelocity(Vector(0,0,0))
+            end
+        end
+    end)
 end

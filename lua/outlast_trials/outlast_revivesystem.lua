@@ -204,48 +204,55 @@ if SERVER then
         adjust = adjust or 0
         local approachDir = direction or "front"
 
-        local forward = target:GetForward()
-        local right = target:GetRight()
-        local targetPos = target:GetPos()
+        if not self.OutlastSnapData then
+            self.OutlastSnapData = {
+                forward = target:GetForward(),
+                right   = target:GetRight(),
+                pos     = target:GetPos(),
+                time    = CurTime()
+            }
+        end
+
+        local f = self.OutlastSnapData.forward
+        local r = self.OutlastSnapData.right
+        local targetPos = self.OutlastSnapData.pos
 
         local desiredPos
         if approachDir == "front" then
-            desiredPos = targetPos + forward * offset
+            desiredPos = targetPos + f * offset
         elseif approachDir == "back" then
-            desiredPos = targetPos - forward * offset
+            desiredPos = targetPos - f * offset
         elseif approachDir == "left" then
-            desiredPos = targetPos - right * offset 
+            desiredPos = targetPos - r * offset
         elseif approachDir == "right" then
-            desiredPos = targetPos + right * offset
+            desiredPos = targetPos + r * offset
         else
-            desiredPos = targetPos + forward * offset
+            desiredPos = targetPos + f * offset
         end
 
         desiredPos.z = targetPos.z
-        desiredPos = desiredPos + right * adjust
+        desiredPos = desiredPos + r * adjust
+
         self.OutlastDesiredPos = desiredPos
 
-        local currentPos = self:GetPos()
-        local lerpSpeed = FrameTime() * 6
-        local newPos = LerpVector(lerpSpeed, currentPos, self.OutlastDesiredPos)
+        local newPos = LerpVector(FrameTime() * 6, self:GetPos(), desiredPos)
         self:SetPos(newPos)
 
-        local lookAng = (targetPos - self:GetPos()):Angle()
+        local lookAng = (targetPos - newPos):Angle()
         lookAng.p = 0
         self:SetAngles(LerpAngle(FrameTime() * 10, self:GetAngles(), lookAng))
         self:SetEyeAngles(lookAng)
+
         local tname = "DesiredPosOutlastCleanUp_" .. self:EntIndex()
-        if timer.Exists(tname) then
-            timer.Adjust(tname, 0.1, 1, function()
-                if IsValid(self) then self.OutlastDesiredPos = nil end
-            end)
-            timer.Start(tname)
-        else
-            timer.Create(tname, 0.1, 1, function()
-                if IsValid(self) then self.OutlastDesiredPos = nil end
-            end)
-        end
+
+        timer.Create(tname, 0.1, 1, function()
+            if IsValid(self) then
+                self.OutlastSnapData = nil
+                self.OutlastDesiredPos = nil
+            end
+        end)
     end
+
 
     function survivor:ResolvePlayerOverlap(target, minDist, tryBoth)
         if not IsValid(target) or not IsValid(self) then return false end
@@ -370,6 +377,8 @@ if SERVER then
             angafterfall.y = angafterfall.y - 90
         end
 
+        self:SetNWAngle("Outlast_AfterFallAngle", angafterfall)
+
         local animKey = string.format("%s_start_%s", mainDir, subDir)
         local animName = OutlastAnims[animKey] or OutlastAnims[mainDir .. "_start_center"]
         local animEndName = OutlastAnims[mainDir .. "_end"]
@@ -380,11 +389,11 @@ if SERVER then
 
         self:SetSVMultiAnimation({animName, animEndName}, true)
         self:Freeze(true)
-        self:SetAngles(angafterfall)
-        self:SetEyeAngles(angafterfall)
-        timer.Create("OutlastAnim_UnfreezeAfterFall" .. self:EntIndex(), finalTime - 1, 1, function()
+        timer.Create("OutlastAnim_UnfreezeAfterFall" .. self:EntIndex(), finalTime + 0.2, 1, function()
             if IsValid(self) then
+                timer.Simple(0.725, function() self:SetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0)) end)
                 self:Freeze(false)
+                self:SetAngles(angafterfall)
             end
         end)
         return finalTime
@@ -525,7 +534,7 @@ if SERVER then
                         if Direction == "front" then
                             ply:SnapToDownedPosition(ReviveTarget, "front", 30)
                         elseif Direction == "back" then
-                            ply:SnapToDownedPosition(ReviveTarget, "back", 55)
+                            ply:SnapToDownedPosition(ReviveTarget, "back", 60)
                         elseif Direction == "left" then
                             ply:SnapToDownedPosition(ReviveTarget, "left", 40)
                         elseif Direction == "right" then
