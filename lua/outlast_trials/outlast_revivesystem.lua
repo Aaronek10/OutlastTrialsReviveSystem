@@ -335,6 +335,7 @@ if SERVER then
         return true
     end
 
+    --[[
     function survivor:HandleFallAnimation(damagePos)
         if not IsValid(self) or not damagePos then return end
 
@@ -388,6 +389,7 @@ if SERVER then
         local finalTime = fallTime + fallEndTime - 1
 
         self:SetSVMultiAnimation({animName, animEndName}, true)
+        self:StartFallMovement(-dir, 50, 6)
         self:Freeze(true)
         timer.Create("OutlastAnim_UnfreezeAfterFall" .. self:EntIndex(), finalTime + 0.2, 1, function()
             if IsValid(self) then
@@ -398,6 +400,7 @@ if SERVER then
         end)
         return finalTime
     end
+    ]]--
 
 
     hook.Add("EntityTakeDamage", "OutlastTrialsReviveSystem_DamageDownedHandler", function(ent, dmginfo)
@@ -413,29 +416,34 @@ if SERVER then
         local damage = dmginfo:GetDamage()
 
         -- Gracz ma paść, ale nie jest jeszcze powalony
-        if damage >= ply:Health() and not ply:IsDowned() and not ply.Outlast_IsFallingToDowned then
+        if damage >= ply:Health() and not ply:IsDowned() then
             dmginfo:SetDamage(0)
+            --[[
             ply.Outlast_IsFallingToDowned = true
             ply:SetNWBool("Outlast_IsFalling", true)
+            ]]--
             ply.DamageOwner = attacker
+            ply:Down()
 
+            --[[
             local timetodown = ply:HandleFallAnimation(damagePos) or 1
-
             timer.Create("OutlastPlayerDownAnim_" .. ply:EntIndex(), timetodown, 1, function()
                 if not IsValid(ply) or not ply:Alive() then return end
                 ply:Down()
                 ply.Outlast_IsFallingToDowned = nil
                 ply:SetNWBool("Outlast_IsFalling", false)
             end)
+            ]]--
 
             hook.Run("Outlast_PlayerDowned", ply, attacker, inflictor)
             return true
         end
 
-        -- Blok obrażeń w trakcie animacji upadku
+        --[[
         if ply.Outlast_IsFallingToDowned then
             return true
         end
+        ]]--
     end)
 
 
@@ -560,7 +568,7 @@ if SERVER then
                 end
             end
 
-            if (ply:IsDowned() or ply.Outlast_IsFallingToDowned) then
+            if ply:IsDowned() then
                 ply:SetActiveWeapon(nil)
             end
 

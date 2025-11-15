@@ -132,6 +132,7 @@ if CLIENT then
 
                 local reviveProgress = otherPly:GetReviveProgress()
                 local reviveCirleAngle = 360 * reviveProgress
+                otherPly.ReviveAngle = Lerp(FrameTime() * 10, otherPly.ReviveAngle or 0, reviveCirleAngle)
 
                 local plyhead = otherPly:LookupBone("ValveBiped.Bip01_Head1")
                 local plyheadpos, plyheadang = otherPly:GetBonePosition(plyhead)
@@ -168,7 +169,7 @@ if CLIENT then
                     surface.DrawTexturedRectRotated(screenX, screenY, 50, 50, 0)
                 else
                     DrawCircularRing(screenX, screenY, 30, 5, -90, 270, Color(0, 0, 0, 200))
-                    DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + reviveCirleAngle, reviveColor)
+                    DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + otherPly.ReviveAngle, reviveColor)
                     surface.SetMaterial(OutlastIcons.state_revive)
                     surface.SetDrawColor(Color(255, 255, 255, 255))
                     surface.DrawTexturedRectRotated(screenX, screenY, 50, 50, 0)
@@ -251,10 +252,11 @@ if CLIENT then
             if ply:IsReviving() then
                 local reviveTarget = ply:GetReviveTarget()
                 local targetReviveProgress = reviveTarget:GetReviveProgress()
-                local targetReviveAngle = 360 * targetReviveProgress 
+                local targetReviveAngle = 360 * targetReviveProgress
+                ply.ReviveAngle = Lerp(FrameTime() * 10, ply.ReviveAngle or 0, targetReviveAngle)
                 if reviveTarget == otherPly then
                     DrawCircularRing(ScrW() / 2, ScrH() / 2, 50, 10, -90, 270, Color(0, 0, 0, 200))
-                    DrawCircularRing(ScrW() / 2, ScrH() / 2, 50, 10, -90, -90 + targetReviveAngle, reviveColor)
+                    DrawCircularRing(ScrW() / 2, ScrH() / 2, 50, 10, -90, -90 + ply.ReviveAngle, reviveColor)
                     surface.SetMaterial(OutlastIcons.state_revive)
                     surface.SetDrawColor(Color(255, 255, 255, 255))
                     surface.DrawTexturedRectRotated(ScrW() / 2, ScrH() / 2, 50, 50, 0)

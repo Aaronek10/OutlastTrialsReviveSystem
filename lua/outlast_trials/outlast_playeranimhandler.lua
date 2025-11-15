@@ -16,21 +16,33 @@ OutlastAnims = {
     fallbackward_start_center = "player_hitreaction_fall_to_downed_backward_start_c_nomo",
     fallbackward_start_left = "player_hitreaction_fall_to_downed_backward_start_l_nomo",
     fallbackward_start_right = "player_hitreaction_fall_to_downed_backward_start_r_nomo",
+    fallbackward_start_center_a = "player_hitreaction_fall_to_downed_backward_start_c",
+    fallbackward_start_left_a = "player_hitreaction_fall_to_downed_backward_start_l",
+    fallbackward_start_right_a  = "player_hitreaction_fall_to_downed_backward_start_r",
 
     fallforward_end = "player_hitreaction_fall_to_downed_forward_end",
     fallforward_start_center = "player_hitreaction_fall_to_downed_forward_start_c_nomo",
     fallforward_start_left = "player_hitreaction_fall_to_downed_forward_start_l_nomo",
     fallforward_start_right = "player_hitreaction_fall_to_downed_forward_start_r_nomo",
+    fallforward_start_center_a = "player_hitreaction_fall_to_downed_forward_start_c",
+    fallforward_start_left_a = "player_hitreaction_fall_to_downed_forward_start_l",
+    fallforward_start_right_a = "player_hitreaction_fall_to_downed_forward_start_r",
 
     fallleft_end = "player_hitreaction_fall_to_downed_left_end",
     fallleft_start_center = "player_hitreaction_fall_to_downed_left_start_c_nomo",
     fallleft_start_left = "player_hitreaction_fall_to_downed_left_start_l_nomo", 
     fallleft_start_right = "player_hitreaction_fall_to_downed_left_start_r_nomo",
+    fallleft_start_center_a = "player_hitreaction_fall_to_downed_left_start_c",
+    fallleft_start_left_a = "player_hitreaction_fall_to_downed_left_start_l", 
+    fallleft_start_right_a = "player_hitreaction_fall_to_downed_left_start_r",
     
     fallright_end = "player_hitreaction_fall_to_downed_right_end",
     fallright_start_center = "player_hitreaction_fall_to_downed_right_start_c_nomo", 
     fallright_start_left = "player_hitreaction_fall_to_downed_right_start_l_nomo",
     fallright_start_right = "player_hitreaction_fall_to_downed_right_start_r_nomo",
+    fallright_start_center_a = "player_hitreaction_fall_to_downed_right_start_c", 
+    fallright_start_left_a = "player_hitreaction_fall_to_downed_right_start_l",
+    fallright_start_right_a = "player_hitreaction_fall_to_downed_right_start_r",
 
     // Downed getting up animations
     getup_phase1_back = "player_helpup_follower_entry_back",
@@ -299,9 +311,9 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     local isBeingRevived = (type(viewply.IsBeingRevived) == "function" and viewply:IsBeingRevived())
     local isExecuting = (type(viewply.IsExecuting) == "function" and viewply:IsExecuting())
     local isBeingExecuted = (type(viewply.IsBeingExecuted) == "function" and viewply:IsBeingExecuted())
-    local isFalling = (type(viewply.IsFallingToDowned) == "function" and viewply:IsFallingToDowned())
+    --local isFalling = (type(viewply.IsFallingToDowned) == "function" and viewply:IsFallingToDowned())
 
-    if not (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted or isFalling) then return end
+    if not (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted) then return end
     local attId = viewply:LookupAttachment("cam")
     local attLoc = viewply:GetAttachment(attId)
     if not attId then
@@ -376,7 +388,7 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     for _, boneName in ipairs(hiddenBones) do
         local boneId = viewply:LookupBone(boneName)
         if boneId then
-            if (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted or isFalling) then
+            if (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted) then
                 viewply:ManipulateBoneScale(boneId, Vector(0, 0, 0))
                 timer.Create("LocalPly_returnbonescales_Bone" .. boneId .. "_" .. viewply:Nick(), 1, 1, function()
                     viewply:ManipulateBoneScale(boneId, Vector(1, 1, 1))
