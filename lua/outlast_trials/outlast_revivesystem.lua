@@ -335,45 +335,82 @@ if SERVER then
         return true
     end
 
-    --[[
+    -- Root-Motion driver for any entity animation
+    function DoRootMotionMovement(entity, sequenceName, duration, rate)
+        if not IsValid(entity) then return end
+
+        local seqId, seqTime = entity:LookupSequence(sequenceName)
+        if seqId < 0 then PrintMessage(HUD_PRINTTALK, "NO SEQID FOUND") return end
+        if seqTime < 0 then PrintMessage(HUD_PRINTTALK, "NO TIME FOUND") return end
+
+        local success, deltaPos, deltaAng = entity:GetSequenceMovement(seqId, 0, 1)
+        if not success then return end
+
+        rate = rate or 1 / 30
+        local totalSteps = math.max(1, math.floor(duration / rate))
+        local stepPos = deltaPos / totalSteps
+        local stepAng = deltaAng / totalSteps
+
+        local entIndex = entity:EntIndex()
+        local timerName = "RootMotion_" .. entIndex .. "_" .. sequenceName
+        --timer.Remove(timerName)
+
+        local startPos = entity:GetPos()
+        local targetPos = startPos + deltaPos
+
+        debugoverlay.Sphere(startPos, 15, 5, Color(0,255,0,255), true)
+        debugoverlay.Sphere(targetPos, 15, 5, Color(255,0,0,255), true)
+        PrintMessage(HUD_PRINTTALK, "Start Pos: " .. tostring(startPos))
+        PrintMessage(HUD_PRINTTALK, "End Pos: " .. tostring(targetPos))
+
+
+        --timer.Create(timerName, rate, totalSteps, function()
+            --if not IsValid(entity) then return end
+
+            --local localPos = entity:LocalToWorld(stepPos) - entity:GetPos()
+
+            -- DEBUG: pokazujemy aktualną pozycję co krok
+            --debugoverlay.Sphere(entity:GetPos(), 3, rate, Color(0,0,255,255), true)
+
+            --entity:SetPos(entity:GetPos() + localPos)
+            --entity:SetAngles(entity:GetAngles() + stepAng)
+        --end)
+    end
+
+
+
     function survivor:HandleFallAnimation(damagePos)
         if not IsValid(self) or not damagePos then return end
 
-        local myPos = self:WorldSpaceCenter()
-        local dir = (damagePos - myPos):GetNormalized()
-
-        -- Lokalna orientacja gracza
-        local forward = self:GetForward()
-        local right = self:GetRight()
-
-        local forwardDot = forward:Dot(dir)
-        local rightDot = right:Dot(dir)
+        local localHit = self:WorldToLocal(damagePos)
+        local ang = math.deg(math.atan2(localHit.y, localHit.x))
 
         local mainDir
-        if forwardDot > 0.5 then
+        if ang > -45 and ang < 45 then
             mainDir = "fallbackward"
-        elseif forwardDot < -0.5 then
+        elseif ang > 135 or ang < -135 then
             mainDir = "fallforward"
-        elseif rightDot > 0 then
-            mainDir = "fallleft"
-        else
+        elseif ang >= 45 and ang <= 135 then
             mainDir = "fallright"
+        else
+            mainDir = "fallleft"
         end
 
         local subDir
-        if math.abs(rightDot) < 0.25 then
+        if math.abs(localHit.y) < 10 then
             subDir = "center"
-        elseif rightDot > 0 then
-            subDir = "left"
-        else
+        elseif localHit.y > 0 then
             subDir = "right"
+        else
+            subDir = "left"
         end
 
         local angafterfall = self:EyeAngles()
+
         if mainDir == "fallbackward" then
             angafterfall.y = angafterfall.y + 180
         elseif mainDir == "fallleft" then
-           angafterfall.y = angafterfall.y + 90
+            angafterfall.y = angafterfall.y + 90
         elseif mainDir == "fallright" then
             angafterfall.y = angafterfall.y - 90
         end
@@ -386,21 +423,30 @@ if SERVER then
 
         local fallID, fallTime = self:LookupSequence(animName)
         local fallEndID, fallEndTime = self:LookupSequence(animEndName)
-        local finalTime = fallTime + fallEndTime - 1
 
-        self:SetSVMultiAnimation({animName, animEndName}, true)
-        self:StartFallMovement(-dir, 50, 6)
+        local finalTime = fallTime + fallEndTime - 1
+        print("Fall time: " .. finalTime)
+
+        --DoRootMotionMovement(self, "player_downed_move_backward_3P", fallTime, 60)
+        self:SetSVMultiAnimation({ animName, animEndName }, true)
+
         self:Freeze(true)
+
         timer.Create("OutlastAnim_UnfreezeAfterFall" .. self:EntIndex(), finalTime + 0.2, 1, function()
-            if IsValid(self) then
-                timer.Simple(0.725, function() self:SetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0)) end)
-                self:Freeze(false)
-                self:SetAngles(angafterfall)
-            end
+            if not IsValid(self) then return end
+
+            timer.Simple(0.725, function()
+                if IsValid(self) then
+                    self:SetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0))
+                end
+            end)
+
+            self:Freeze(false)
         end)
+
         return finalTime
     end
-    ]]--
+
 
 
     hook.Add("EntityTakeDamage", "OutlastTrialsReviveSystem_DamageDownedHandler", function(ent, dmginfo)
@@ -416,16 +462,13 @@ if SERVER then
         local damage = dmginfo:GetDamage()
 
         -- Gracz ma paść, ale nie jest jeszcze powalony
-        if damage >= ply:Health() and not ply:IsDowned() then
+        if damage >= ply:Health() and not ply:IsDowned() and not ply.Outlast_IsFallingToDowned then
             dmginfo:SetDamage(0)
-            --[[
             ply.Outlast_IsFallingToDowned = true
             ply:SetNWBool("Outlast_IsFalling", true)
-            ]]--
             ply.DamageOwner = attacker
-            ply:Down()
+            --ply:Down()
 
-            --[[
             local timetodown = ply:HandleFallAnimation(damagePos) or 1
             timer.Create("OutlastPlayerDownAnim_" .. ply:EntIndex(), timetodown, 1, function()
                 if not IsValid(ply) or not ply:Alive() then return end
@@ -433,17 +476,14 @@ if SERVER then
                 ply.Outlast_IsFallingToDowned = nil
                 ply:SetNWBool("Outlast_IsFalling", false)
             end)
-            ]]--
 
             hook.Run("Outlast_PlayerDowned", ply, attacker, inflictor)
             return true
         end
 
-        --[[
         if ply.Outlast_IsFallingToDowned then
             return true
         end
-        ]]--
     end)
 
 
@@ -464,7 +504,7 @@ if SERVER then
                         timer.Simple(3, function()
                             if IsValid(ply) then
                                 ply:SetPos(ply:GetPos() + Vector(0,0,5))
-                                ply:TakeDamage(ply:Health(), ply.DamageOwner or game.GetWorld(), nil)
+                                ply:TakeDamage(ply:Health(), ply.DamageOwner or game.GetWorld(), ply)
                                 ply:Freeze(false)
                                 ply.PlayingDeathAnim = false
                             end
