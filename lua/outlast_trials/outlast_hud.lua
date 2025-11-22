@@ -134,6 +134,10 @@ if CLIENT then
                 local reviveCirleAngle = 360 * reviveProgress
                 otherPly.ReviveAngle = Lerp(FrameTime() * 10, otherPly.ReviveAngle or 0, reviveCirleAngle)
 
+                local healthFraction = math.Clamp(otherPly:Health() / otherPly:GetMaxHealth(), 0, 1)
+                if healthFraction < 0 then healthFraction = 0 end
+                local HPAngle = 360 * healthFraction
+
                 local plyhead = otherPly:LookupBone("ValveBiped.Bip01_Head1")
                 local plyheadpos, plyheadang = otherPly:GetBonePosition(plyhead)
                 local correctpos = plyheadpos + Vector(0, 0, 15)
@@ -158,6 +162,7 @@ if CLIENT then
                     draw.SimpleText(otherPly:Nick(), "TargetID", screenX, screenY - 50, Color(255,255,255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                     DrawCircularRing(screenX, screenY, 30, 5, -90, 270, Color(0, 0, 0, 200))
                     DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + plyangle, ringcolor)
+                    DrawCircularRing(screenX, screenY, 33, 2, -90, -90 + HPAngle, Color(99, 0, 0))
                     if plytimeLeft <= 0 then
                         surface.SetMaterial(OutlastIcons.state_dead)
                     elseif otherPly:IsBeingExecuted() then

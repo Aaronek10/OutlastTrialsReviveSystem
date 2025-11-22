@@ -335,138 +335,152 @@ if SERVER then
         return true
     end
 
-    -- Lerp z root motion w kierunku upadku
-    function DoRootMotionLerp(entity, sequenceName, duration, steps, fallDir)
-        if not IsValid(entity) then return end
 
-        -- Lookup sekwencji
-        local seqId, seqTime = entity:LookupSequence(sequenceName)
-        if seqId < 0 then 
-            PrintMessage(HUD_PRINTTALK, "NO SEQID FOUND") 
-            return 
+    function DoRootMotionLerp(ent, sequenceName, duration, steps, invertMovement)
+        if not IsValid(ent) then return end
+
+        -- Pobranie sekwencji
+        local seq, seqDur = ent:LookupSequence(sequenceName)
+        if seq < 0 then return end
+
+        -- Pobranie root-motion z animacji
+        local ok, deltaPos, deltaAng = ent:GetSequenceMovement(seq, 0, seqDur)
+        if not ok then return end
+
+        -- Odwracanie rootmotion dla left/right
+        if invertMovement then
+            deltaPos = deltaPos * -1
         end
-        if seqTime < 0 then 
-            PrintMessage(HUD_PRINTTALK, "NO TIME FOUND") 
-            return 
+
+        -- Konwersja offsetu sekwencji na światowe delta
+        local ang = ent:GetAngles()
+        local worldDelta =
+            ang:Forward() * deltaPos.x +
+            ang:Right()   * deltaPos.y +
+            ang:Up()      * deltaPos.z
+
+        -- Lerp per-step
+        local perStep     = worldDelta / steps
+        local perStepAng  = deltaAng  / steps
+        local stepTime    = duration / steps
+
+        -- === NOWE: kierunek ruchu i NWAngle ===
+        local moveDir = perStep:GetNormalized()
+
+        -- Jeżeli deltaPos jest zerowe (niektóre animacje tak mają), unikamy invalid angle
+        if moveDir:LengthSqr() > 0.0001 then
+            local targetAng = moveDir:Angle()
+            ent:SetNWAngle("Outlast_AfterFallAngle", targetAng)
         end
 
-        -- Pobranie ruchu animacji (root motion)
-        local success, deltaPos, deltaAng = entity:GetSequenceMovement(seqId, 0, 1)
-        if not success then return end
+        --------------------------------------------------------------------------
+        -- Timer wykonujący root-motion krok po kroku
+        --------------------------------------------------------------------------
+        local timerID = "OutlastRM_" .. ent:EntIndex()
 
-        local startPos = entity:GetPos()
-        local startAng = entity:GetAngles()
-
-        -- Obracamy deltaPos animacji względem fallDir
-        local right = fallDir:Angle():Right()
-        local worldDelta = fallDir * deltaPos.x + right * deltaPos.y + Vector(0,0,deltaPos.z)
-        local targetPos = startPos + worldDelta
-
-        -- Dopasowanie kąta końcowego
-        local targetAng = startAng + deltaAng
-        targetAng.y = startAng.y + deltaAng.y -- zachowaj orientację yaw animacji względem gracza
-
-        -- DEBUG: pokaż start i koniec
-        debugoverlay.Sphere(startPos, 15, 5, Color(0,255,0,255), true)
-        debugoverlay.Sphere(targetPos, 15, 5, Color(255,0,0,255), true)
-        PrintMessage(HUD_PRINTTALK, string.format("RootMotion start: %s / %s", tostring(startPos), tostring(startAng)))
-        PrintMessage(HUD_PRINTTALK, string.format("RootMotion target: %s / %s", tostring(targetPos), tostring(targetAng)))
-
-        steps = steps or 30
-        local step = 0
-        local timerName = "RootMotionLerp_" .. entity:EntIndex() .. "_" .. sequenceName
-        timer.Remove(timerName)
-
-        -- Lerp w czasie trwania animacji
-        timer.Create(timerName, duration / steps, steps, function()
-            if not IsValid(entity) then return end
-
-            step = step + 1
-            local frac = step / steps
-
-            local newPos = LerpVector(frac, startPos, targetPos)
-            local newAng = LerpAngle(frac, startAng, targetAng)
-
-            entity:SetPos(newPos)
-            entity:SetAngles(newAng)
-
-            PrintMessage(HUD_PRINTTALK, string.format("RootMotion step %d/%d: Pos=%s Ang=%s", step, steps, tostring(newPos), tostring(newAng)))
-
-            if step >= steps then
-                PrintMessage(HUD_PRINTTALK, "RootMotion finished!")
+        timer.Create(timerID, stepTime, steps, function()
+            if not IsValid(ent) then
+                timer.Remove(timerID)
+                return
             end
+
+            local startPos = ent:GetPos()
+            local targetPos = startPos + perStep
+
+            -- Collision bounds
+            local mins = ent:OBBMins()
+            local maxs = ent:OBBMaxs()
+
+            -- TraceHull aby nie wejść w ściany/NPC/propy/graczy
+            local tr = util.TraceHull({
+                start  = startPos,
+                endpos = targetPos,
+                mins   = mins,
+                maxs   = maxs,
+                filter = ent
+            })
+
+            if tr.Hit then
+                -- Zatrzymujemy animację ruchu
+                timer.Remove(timerID)
+                return
+            end
+
+            -- Ustawiamy nową pozycję i obrót
+            ent:SetPos(tr.HitPos)
+            ent:SetAngles(ent:GetAngles() + perStepAng)
         end)
     end
 
-    -- Obsługa animacji powalenia
-    function survivor:HandleFallAnimation(damagePos)
-        if not IsValid(self) or not damagePos then return end
+    function survivor:HandleFallAnimation(dmgpos)
+        local ply = self
 
-        local myPos = self:WorldSpaceCenter()
-        local localHit = self:WorldToLocal(damagePos)
-        local fallDir = (myPos - damagePos)
-        fallDir.z = 0
-        fallDir:Normalize()
+        local modelAng = ply:GetAngles()
+        local forward = modelAng:Forward()
+        local right   = modelAng:Right()
 
-        -- Ustal kierunek upadku (góra/dół)
-        local ang = math.deg(math.atan2(localHit.y, localHit.x))
-        local mainDir
-        if ang > -45 and ang < 45 then
-            mainDir = "fallbackward"
-        elseif ang > 135 or ang < -135 then
-            mainDir = "fallforward"
-        elseif ang >= 45 and ang <= 135 then
-            mainDir = "fallright"
+        -- kierunek dmg względem gracza (2D)
+        local dir = (dmgpos - ply:GetPos())
+        dir.z = 0
+        dir:Normalize()
+
+        -- Debug
+        local startPos = ply:GetPos() + Vector(0,0,50)
+        debugoverlay.Line(startPos, startPos + forward * 60, 2, Color(0,255,0), true)
+        debugoverlay.Line(startPos, startPos + right * 60,   2, Color(0,0,255), true)
+        debugoverlay.Line(startPos, startPos + dir * 60,     2, Color(255,0,0), true)
+
+        -- kąty kierunku
+        local angle = math.deg(math.atan2(right:Dot(dir), forward:Dot(dir)))
+
+        local animPrefix
+
+        if angle >= -45 and angle <= 45 then
+            animPrefix = "fallbackward"  -- przód
+        elseif angle > 45 and angle < 135 then
+            animPrefix = "fallleft"    -- prawo
+        elseif angle < -45 and angle > -135 then
+            animPrefix = "fallright"     -- lewo
         else
-            mainDir = "fallleft"
+            animPrefix = "fallforward" -- tył
         end
 
-        local subDir
-        if math.abs(localHit.y) < 10 then
-            subDir = "center_rootmotion"
-        elseif localHit.y > 0 then
-            subDir = "right_rootmotion"
-        else
-            subDir = "left_rootmotion"
-        end
+        -- tylko centralne starty
+        local startAnim = animPrefix .. "_start_center_rootmotion"
+        local endAnim   = animPrefix .. "_end"
 
-        -- Ustaw kąt po upadku
-        local angafterfall = self:EyeAngles()
-        if mainDir == "fallbackward" then
-            angafterfall.y = angafterfall.y + 180
-        elseif mainDir == "fallleft" then
-            angafterfall.y = angafterfall.y + 90
-        elseif mainDir == "fallright" then
-            angafterfall.y = angafterfall.y - 90
-        end
-        self:SetNWAngle("Outlast_AfterFallAngle", angafterfall)
+        -- wyciąganie z tabeli
+        local fStart = OutlastAnims[startAnim]
+        local fEnd   = OutlastAnims[endAnim]
 
-        local animKey = string.format("%s_start_%s", mainDir, subDir)
-        local animName = OutlastAnims[animKey] or OutlastAnims[mainDir .. "_start_center"]
-        local animEndName = OutlastAnims[mainDir .. "_end"]
+        local startSeq, startTime = ply:LookupSequence(fStart)
+        local endSeq, endTime     = ply:LookupSequence(fEnd)
+        local totalTime = startTime + endTime
 
-        local fallID, fallTime = self:LookupSequence(animName)
-        local fallEndID, fallEndTime = self:LookupSequence(animEndName)
-        local finalTime = fallTime + fallEndTime - 1
-        print("Fall time: " .. finalTime)
+        ply:SetSVMultiAnimation({fStart, fEnd}, true)
 
-        -- Root motion z uwzględnieniem kierunku upadku
-        DoRootMotionLerp(self, animName, fallTime, 60, -fallDir)
-        self:SetSVMultiAnimation({ animName, animEndName }, true)
+        local invertMovement = (animPrefix == "fallright" or animPrefix == "fallleft")
+        DoRootMotionLerp(ply, fStart, startTime, 60, invertMovement)
 
-        self:Freeze(true)
-        timer.Create("OutlastAnim_UnfreezeAfterFall" .. self:EntIndex(), finalTime + 0.2, 1, function()
-            if not IsValid(self) then return end
+        ply:Freeze(true)
+
+        timer.Create("OutlastPlayerFallAnimUnfreeze_" .. ply:EntIndex(), totalTime, 1, function()
             timer.Simple(0.725, function()
-                if IsValid(self) then
-                    self:SetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0))
+                if IsValid(ply) then
+                    ply:SetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0))
                 end
             end)
-            self:Freeze(false)
+            ply:Freeze(false)
         end)
 
-        return finalTime
+
+        return totalTime - 1.725
     end
+
+
+
+
+
 
     hook.Add("EntityTakeDamage", "OutlastTrialsReviveSystem_DamageDownedHandler", function(ent, dmginfo)
         if not GetConVar("outlasttrials_enabled"):GetBool() then return end
@@ -476,7 +490,7 @@ if SERVER then
         if not ply:Alive() then return end
 
         local inflictor = dmginfo:GetInflictor()
-        local damagePos = IsValid(inflictor) and inflictor:GetPos() or dmginfo:GetDamagePosition()
+        local damagePos = IsValid(inflictor) and inflictor:GetPos() or dmginfo:GetAttacker():GetPos()
         local attacker = dmginfo:GetAttacker()
         local damage = dmginfo:GetDamage()
 
@@ -494,6 +508,7 @@ if SERVER then
                 ply:Down()
                 ply.Outlast_IsFallingToDowned = nil
                 ply:SetNWBool("Outlast_IsFalling", false)
+                ply:SetEyeAngles(ply:GetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0)))
             end)
 
             hook.Run("Outlast_PlayerDowned", ply, attacker, inflictor)

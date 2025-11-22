@@ -13,33 +13,21 @@ OutlastAnims = {
 
     // Fall animations depending on direction of hit
     fallbackward_end = "player_hitreaction_fall_to_downed_backward_end",
-    fallbackward_start_center = "player_hitreaction_fall_to_downed_backward_start_c_nomo",
-    fallbackward_start_left = "player_hitreaction_fall_to_downed_backward_start_l_nomo",
-    fallbackward_start_right = "player_hitreaction_fall_to_downed_backward_start_r_nomo",
     fallbackward_start_center_rootmotion = "player_hitreaction_fall_to_downed_backward_start_c",
     fallbackward_start_left_rootmotion = "player_hitreaction_fall_to_downed_backward_start_l",
     fallbackward_start_right_rootmotion  = "player_hitreaction_fall_to_downed_backward_start_r",
 
     fallforward_end = "player_hitreaction_fall_to_downed_forward_end",
-    fallforward_start_center = "player_hitreaction_fall_to_downed_forward_start_c_nomo",
-    fallforward_start_left = "player_hitreaction_fall_to_downed_forward_start_l_nomo",
-    fallforward_start_right = "player_hitreaction_fall_to_downed_forward_start_r_nomo",
     fallforward_start_center_rootmotion = "player_hitreaction_fall_to_downed_forward_start_c",
     fallforward_start_left_rootmotion = "player_hitreaction_fall_to_downed_forward_start_l",
     fallforward_start_right_rootmotion = "player_hitreaction_fall_to_downed_forward_start_r",
 
     fallleft_end = "player_hitreaction_fall_to_downed_left_end",
-    fallleft_start_center = "player_hitreaction_fall_to_downed_left_start_c_nomo",
-    fallleft_start_left = "player_hitreaction_fall_to_downed_left_start_l_nomo", 
-    fallleft_start_right = "player_hitreaction_fall_to_downed_left_start_r_nomo",
     fallleft_start_center_rootmotion = "player_hitreaction_fall_to_downed_left_start_c",
     fallleft_start_left_rootmotion = "player_hitreaction_fall_to_downed_left_start_l", 
     fallleft_start_right_rootmotion = "player_hitreaction_fall_to_downed_left_start_r",
     
     fallright_end = "player_hitreaction_fall_to_downed_right_end",
-    fallright_start_center = "player_hitreaction_fall_to_downed_right_start_c_nomo", 
-    fallright_start_left = "player_hitreaction_fall_to_downed_right_start_l_nomo",
-    fallright_start_right = "player_hitreaction_fall_to_downed_right_start_r_nomo",
     fallright_start_center_rootmotion = "player_hitreaction_fall_to_downed_right_start_c", 
     fallright_start_left_rootmotion = "player_hitreaction_fall_to_downed_right_start_l",
     fallright_start_right_rootmotion = "player_hitreaction_fall_to_downed_right_start_r",
@@ -311,13 +299,19 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     local isBeingRevived = (type(viewply.IsBeingRevived) == "function" and viewply:IsBeingRevived())
     local isExecuting = (type(viewply.IsExecuting) == "function" and viewply:IsExecuting())
     local isBeingExecuted = (type(viewply.IsBeingExecuted) == "function" and viewply:IsBeingExecuted())
-    --local isFalling = (type(viewply.IsFallingToDowned) == "function" and viewply:IsFallingToDowned())
+    local isFalling = (type(viewply.IsFallingToDowned) == "function" and viewply:IsFallingToDowned())
 
-    if not (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted) then return end
+    if not (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted or isFalling) then return end
     local attId = viewply:LookupAttachment("cam")
     local attLoc = viewply:GetAttachment(attId)
+    
     if not attId then
         chat.AddText("attId not found. Using Default EyeAngles and Pos.") 
+        return 
+    end
+
+    if not attLoc then
+        chat.AddText("attLoc not found. Using Default EyeAngles and Pos.") 
         return 
     end
 
@@ -337,19 +331,19 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
         OutlastAnims.helpup_phase1_right, OutlastAnims.helpup_phase2_right, OutlastAnims.helpup_phase3_right,
 
         -- Fall backward
-        OutlastAnims.fallbackward_start_center, OutlastAnims.fallbackward_start_left, OutlastAnims.fallbackward_start_right,
+        OutlastAnims.fallbackward_start_center_rootmotion, OutlastAnims.fallbackward_start_left_rootmotion, OutlastAnims.fallbackward_start_right_rootmotion,
         OutlastAnims.fallbackward_end,
 
         -- Fall forward
-        OutlastAnims.fallforward_start_center, OutlastAnims.fallforward_start_left, OutlastAnims.fallforward_start_right,
+        OutlastAnims.fallforward_start_center_rootmotion, OutlastAnims.fallforward_start_left_rootmotion, OutlastAnims.fallforward_start_right_rootmotion,
         OutlastAnims.fallforward_end,
 
         -- Fall left
-        OutlastAnims.fallleft_start_center, OutlastAnims.fallleft_start_left, OutlastAnims.fallleft_start_right,
+        OutlastAnims.fallleft_start_center_rootmotion, OutlastAnims.fallleft_start_left_rootmotion, OutlastAnims.fallleft_start_right_rootmotion,
         OutlastAnims.fallleft_end,
 
         -- Fall right
-        OutlastAnims.fallright_start_center, OutlastAnims.fallright_start_left, OutlastAnims.fallright_start_right,
+        OutlastAnims.fallright_start_center_rootmotion, OutlastAnims.fallright_start_left_rootmotion, OutlastAnims.fallright_start_right_rootmotion,
         OutlastAnims.fallright_end,
 
         -- Deaths and finishers
@@ -388,7 +382,7 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     for _, boneName in ipairs(hiddenBones) do
         local boneId = viewply:LookupBone(boneName)
         if boneId then
-            if (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted) then
+            if (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted or isFalling) then
                 viewply:ManipulateBoneScale(boneId, Vector(0, 0, 0))
                 timer.Create("LocalPly_returnbonescales_Bone" .. boneId .. "_" .. viewply:Nick(), 1, 1, function()
                     viewply:ManipulateBoneScale(boneId, Vector(1, 1, 1))
@@ -436,7 +430,5 @@ if CLIENT then
             end
         end
     end)
-
-
 end
 
