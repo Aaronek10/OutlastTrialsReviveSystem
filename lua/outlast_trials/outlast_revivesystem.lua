@@ -473,7 +473,6 @@ if SERVER then
             ply:Freeze(false)
         end)
 
-
         return totalTime - 1.725
     end
 
@@ -640,6 +639,12 @@ if SERVER then
                     ply:ResolvePlayerOverlap(ReviveTarget, 40, false)
                     ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
                 end
+            end
+
+            //Allow player to drain his time by holding ctrl key
+            if ply:IsDowned() and ply:KeyDown(IN_DUCK) then
+                local bleedoutTime = ply:GetBleedoutTime()
+                ply:SetBleedoutTime(CurTime() + bleedoutTime - (FrameTime() * 10))
             end
 
             if ply:IsDowned() then

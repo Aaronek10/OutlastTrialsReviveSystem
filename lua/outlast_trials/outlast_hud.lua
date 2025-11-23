@@ -120,6 +120,14 @@ if CLIENT then
             surface.SetDrawColor(Color(255,255,255))
             surface.DrawTexturedRect(0, 0, w, h)
             surface.DrawTexturedRectUV(0, 0, w, h, 1, 0, 0, 1)
+
+            draw.SimpleTextOutlined("[CTRL]", "DermaDefault", ScrW() / 2 - 25, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
+            surface.SetMaterial(OutlastIcons.obj_base2)
+            surface.SetDrawColor(Color(255,255,255))
+            surface.DrawTexturedRectRotated(ScrW() / 2 + 45, ScrH() / 2 + 100, 50, 50, 0)
+            surface.SetMaterial(OutlastIcons.trans_bleedout)
+            surface.SetDrawColor(Color(255,255,255))
+            surface.DrawTexturedRectRotated(ScrW() / 2 + 45, ScrH() / 2 + 100, 25, 25, 0)
         end
 
         local players = player.GetAll()
@@ -237,7 +245,7 @@ if CLIENT then
             local tr = ply:GetEyeTrace()
             if tr.Entity == otherPly and otherPly:IsDowned() and otherPly:Alive() and tr.HitPos:DistToSqr(ply:GetPos()) < 10000 and not otherPly:IsBeingRevived() then
                 --local name = otherPly:Nick()
-                draw.SimpleTextOutlined("[E]", "DermaLarge", ScrW() / 2 - 25, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
+                draw.SimpleTextOutlined("[E]", "DermaDefault", ScrW() / 2 - 25, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
                 surface.SetMaterial(OutlastIcons.obj_base2)
                 surface.SetDrawColor(Color(255,255,255))
                 surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 100, 50, 50, 0)
@@ -245,7 +253,7 @@ if CLIENT then
                 surface.SetDrawColor(Color(255,255,255))
                 surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 100, 25, 25, 0)
 
-                draw.SimpleTextOutlined("[R]", "DermaLarge", ScrW() / 2 - 25, ScrH() / 2 + 150, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
+                draw.SimpleTextOutlined("[R]", "DermaDefault", ScrW() / 2 - 25, ScrH() / 2 + 150, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
                 surface.SetMaterial(OutlastIcons.obj_base2)
                 surface.SetDrawColor(Color(255,255,255))
                 surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 150, 50, 50, 0)
@@ -286,4 +294,14 @@ if CLIENT then
             end
         end
     end)
+
+    hook.Add("SetupMove", "Outlast_BlockInputs", function(ply, mv)
+        if ply:IsDowned() then
+            local buttons = mv:GetButtons()
+            buttons = bit.band(buttons, bit.bnot(IN_JUMP))
+            mv:SetButtons(buttons)
+        end
+    end)
+
+
 end

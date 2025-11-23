@@ -7,6 +7,8 @@ OutlastAnims = {
     movebackward = "player_downed_move_backward_3P_nomo",
     moveright = "player_downed_move_right_3P_nomo",
     moveleft = "player_downed_move_left_3P_nomo",
+    turn_left = "player_downed_turn_90_L",
+    turn_right = "player_downed_turn_90_R",
 
     // Death
     downeddeath = "player_downed_bleedout_to_dead",
@@ -232,9 +234,7 @@ if SERVER then
 end
 
 hook.Add("CalcMainActivity", "!OutlastTrialsDownedAnimations", function(ply, vel)
-    
     if ply:IsDowned() and ply:GetNWString("SVAnim", "") == "" then
-
         if not ply.OutlastAnimCache then
             ply.OutlastAnimCache = {}
             for key, seqName in pairs(OutlastAnims) do
@@ -242,9 +242,27 @@ hook.Add("CalcMainActivity", "!OutlastTrialsDownedAnimations", function(ply, vel
             end
         end
 
-        local dir = ply:MovingDirection(8)
-        local moving = vel:Length2D() > 10
         local anims = ply.OutlastAnimCache
+        local dir   = ply:MovingDirection(8)
+        local moving = vel:Length2D() > 10
+        local yaw = ply:EyeAngles().y
+
+        if not ply._lastYaw then
+            ply._lastYaw = yaw
+        end
+
+        local deltaYaw = math.AngleDifference(yaw, ply._lastYaw)
+        ply._lastYaw = yaw
+
+        local threshold = 1
+
+        if not moving then
+            if deltaYaw > threshold then
+                return -1, anims.turn_right
+            elseif deltaYaw < -threshold then
+                return -1, anims.turn_left
+            end
+        end
 
         if dir == "forward" and moving then
             return -1, anims.moveforward
@@ -259,6 +277,7 @@ hook.Add("CalcMainActivity", "!OutlastTrialsDownedAnimations", function(ply, vel
         end
     end
 end)
+
 
 hook.Add("CalcMainActivity", "OutlastTrialsSVAnimHandler", function(ply, vel)
     local str = ply:GetNWString('SVAnim')
