@@ -425,7 +425,7 @@ if CLIENT then
             if ply:IsExecuting() then
                 -- Stwórz model tylko raz
                 if not IsValid(ply.Outlast_knife) then
-                    ply.Outlast_knife = ClientsideModel("models/weapons/execution/w_nmrih_knife.mdl", RENDERGROUP_OPAQUE)
+                    ply.Outlast_knife = ClientsideModel("models/weapons/outlast/execution/w_nmrih_knife.mdl", RENDERGROUP_OPAQUE)
                     ply.Outlast_knife:SetNoDraw(false)
                     ply.Outlast_knife:SetParent(ply)
                     -- ply.Outlast_knife:AddEffects(EF_BONEMERGE)
