@@ -76,7 +76,7 @@ if SERVER then
 
     print("[OUTLAST TRIALS] SERVER System Loaded")
 
-    util.AddNetworkString("OutlastTrialsReviveSystem_NotifyDowned")
+    util.AddNetworkString("OutlastTrialsReviveSystem_Notify")
 
     function survivor:SetDownedState(state)
         self:SetNWBool("Outlast_IsDowned", state)
@@ -457,6 +457,7 @@ if SERVER then
         local endSeq, endTime     = ply:LookupSequence(fEnd)
         local totalTime = startTime + endTime
 
+        ply:StopSVMultiAnimation() // just in case
         ply:SetSVMultiAnimation({fStart, fEnd}, true)
 
         local invertMovement = (animPrefix == "fallright" or animPrefix == "fallleft")
@@ -508,9 +509,10 @@ if SERVER then
                 ply.Outlast_IsFallingToDowned = nil
                 ply:SetNWBool("Outlast_IsFalling", false)
                 ply:SetEyeAngles(ply:GetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0)))
+                hook.Run("Outlast_PlayerDowned", ply, attacker, inflictor)
             end)
 
-            hook.Run("Outlast_PlayerDowned", ply, attacker, inflictor)
+
             return true
         end
 
@@ -522,7 +524,9 @@ if SERVER then
 
     hook.Add("Think", "OutlastTrialsReviveSystem_Think", function()
         if not GetConVar("outlasttrials_enabled"):GetBool() then return end
-        for _, ply in pairs(player.GetAll()) do
+
+        local players = player.GetAll()
+        for _, ply in ipairs(players) do
             if ply:IsDowned() then
 
                 if IsValid(ply:GetReviveTarget()) then
@@ -534,6 +538,7 @@ if SERVER then
                     if not ply.PlayingDeathAnim then
                         ply:SetSVAnimation(OutlastAnims.downeddeath, true)
                         ply:Freeze(true)
+
                         timer.Simple(3, function()
                             if IsValid(ply) then
                                 ply:SetPos(ply:GetPos() + Vector(0,0,5))
@@ -542,12 +547,46 @@ if SERVER then
                                 ply.PlayingDeathAnim = false
                             end
                         end)
+
                         ply.PlayingDeathAnim = true
                     end
                 end
             end
         end
+
+        local alivePlayers = {}
+        for _, ply in ipairs(players) do
+            if ply:Alive() then
+                table.insert(alivePlayers, ply)
+            end
+        end
+
+        if #alivePlayers == 0 then return end
+
+        local allDowned = true
+        for _, ply in ipairs(alivePlayers) do
+            if not ply:IsDowned() then
+                allDowned = false
+                break
+            end
+        end
+
+        if allDowned then
+            for _, ply in ipairs(alivePlayers) do
+                if ply:Alive() and ply:IsDowned() and not ply:IsPlayingSVAnimation() and not ply.AllDownedTimerSet then
+                    ply:SetBleedoutTime(CurTime() + 1)
+                    print("[OTRS] All players are downed! Forcing bleedout for: " .. ply:Nick())
+                    timer.Simple(4, function()
+                        if IsValid(ply) then
+                            ply.AllDownedTimerSet = nil
+                        end
+                    end)
+                    ply.AllDownedTimerSet = true
+                end
+            end
+        end
     end)
+
 
     hook.Add("PlayerDeath", "OutlastTrialsReviveSystem_DeathHandler", function(ply, inflictor, attacker)
         if not GetConVar("outlasttrials_enabled"):GetBool() then return end
@@ -641,14 +680,20 @@ if SERVER then
                 end
             end
 
+            if ply:IsDowned() then
+                ply:SetActiveWeapon(nil)
+            end
+
+            if ply:IsBeingRevived() then
+                ply:Freeze(true)
+            else
+                ply:Freeze(false)
+            end
+
             //Allow player to drain his time by holding ctrl key
             if ply:IsDowned() and ply:KeyDown(IN_DUCK) then
                 local bleedoutTime = ply:GetBleedoutTime()
                 ply:SetBleedoutTime(CurTime() + bleedoutTime - (FrameTime() * 10))
-            end
-
-            if ply:IsDowned() then
-                ply:SetActiveWeapon(nil)
             end
 
             //Executions Section
@@ -658,14 +703,14 @@ if SERVER then
                 local ExecDirection = GetApproachDirection(ply, target)
 
                 if IsValid(target) and target:IsPlayer() and target:IsDowned() and not (target:GetBleedoutTime() <= 0) then
-                    if target:GetPos():DistToSqr(ply:GetPos()) < 10000 then
+                    if target:GetPos():DistToSqr(ply:GetPos()) < 10000 and not target:IsPlayingSVAnimation() then
                         --PrintMessage(HUD_PRINTTALK, ply:Nick() .. " tried killing a: " .. target:Nick())
                         target:SetNWEntity("Outlast_Impostor", ply)
                         ply:SetNWEntity("Outlast_ImpostorVictim", target) 
                         ply.ExecTarget = target
                         ply.ExecDirection = ExecDirection
                         ply.ExecStart = CurTime()
-                        ply.StartedExecution = false -- reset na wszelki wypadek
+                        ply.StartedExecution = false
                         ply.Outlast_UnequipedWeapon = ply:GetActiveWeapon()
                         hook.Run("Outlast_PlayerExecuting", ply, target)
                     end
@@ -744,6 +789,63 @@ if SERVER then
                 end
             end
         end
+    end)
+
+    //Notifications
+
+    hook.Add("Outlast_PlayerDowned", "OutlastTrialsReviveSystem_NotifyDowned", function(downedPlayer, attacker, inflictor)
+        if not IsValid(downedPlayer) then return end
+
+        local attName
+        local wepName
+
+        if IsValid(attacker) then
+
+            if attacker:IsPlayer() then
+                attName = attacker:Nick()
+            else
+                attName = GAMEMODE:GetDeathNoticeEntityName(attacker)
+            end
+
+            if IsValid(inflictor) and attacker ~= inflictor then
+                wepName = inflictor:GetPrintName()
+            elseif IsValid(attacker) and IsValid(attacker:GetActiveWeapon()) then
+                wepName = attacker:GetActiveWeapon():GetPrintName()
+            end
+
+        else
+            attName = ""
+            wepName = ""
+        end
+
+        net.Start("OutlastTrialsReviveSystem_Notify")
+            net.WriteString(downedPlayer:Nick())
+            net.WriteString(attName)
+            net.WriteString(wepName)
+            net.WriteString("downed")
+        net.Broadcast()
+    end)
+
+    hook.Add("Outlast_PlayerRevived", "OutlastTrialsReviveSystem_NotifyRevived", function(reviver, revivedPlayer)
+        if not IsValid(reviver) or not IsValid(revivedPlayer) then return end
+
+        net.Start("OutlastTrialsReviveSystem_Notify")
+            net.WriteString(revivedPlayer:Nick())
+            net.WriteString(reviver:Nick())
+            net.WriteString("")
+            net.WriteString("revive")
+        net.Broadcast()
+    end)
+
+    hook.Add("Outlast_PlayerExecuting", "OutlastTrialsReviveSystem_NotifyExecuting", function(executor, victim)
+        if not IsValid(executor) or not IsValid(victim) then return end
+
+        net.Start("OutlastTrialsReviveSystem_Notify")
+            net.WriteString(victim:Nick())
+            net.WriteString(executor:Nick())
+            net.WriteString("")
+            net.WriteString("execute")
+        net.Broadcast()
     end)
 end
 

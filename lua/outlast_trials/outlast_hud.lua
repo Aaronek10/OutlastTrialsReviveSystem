@@ -303,5 +303,72 @@ if CLIENT then
         end
     end)
 
+    net.Receive("OutlastTrialsReviveSystem_Notify", function()
+        local downedPlayer = net.ReadString()
+        local attackerPlayer = net.ReadString()
+        local wep = net.ReadString()
+        local actionType = net.ReadString()
 
+        if actionType == "revive" then
+            
+            local colPrefix = Color(200, 0, 0)
+            local colDowned = Color(50, 200, 50)
+            local colText = Color(255, 255, 255)
+
+            chat.AddText(
+                colPrefix, "[OTRS] ",
+                colDowned, downedPlayer,
+                colText, " was revived by ",
+                colDowned, attackerPlayer,
+                colText, "."
+            )
+
+            surface.PlaySound("items/smallmedkit1.wav")
+
+        elseif actionType == "downed" then
+
+            local colPrefix = Color(200, 0, 0)
+            local colDowned = Color(50, 200, 50)
+            local colAttacker = Color(200, 50, 50)
+            local colWeapon = Color(200, 50, 50)
+            local colText = Color(255, 255, 255)
+
+            if attackerPlayer == "" or attackerPlayer == nil then
+                chat.AddText(
+                    colPrefix, "[OTRS] ",
+                    colDowned, downedPlayer,
+                    colText, " is incapacitated."
+                )
+            else
+                chat.AddText(
+                    colPrefix, "[OTRS] ",
+                    colDowned, downedPlayer,
+                    colText, " was downed by ",
+                    colAttacker, attackerPlayer,
+                    colText, " using ",
+                    colWeapon, wep,
+                    colText, "."
+                )
+            end
+
+            surface.PlaySound("outlasttrials/cue/MU_Stinger_KnockedDownMate.ogg")
+
+        elseif actionType == "execute" then
+            local colPrefix = Color(200, 0, 0)
+            local colDowned = Color(50, 200, 50)
+            local colAttacker = Color(200, 50, 50)
+            local colWeapon = Color(200, 50, 50)
+            local colText = Color(255, 255, 255)
+
+            chat.AddText(
+                colPrefix, "[OTRS] ",
+                colDowned, downedPlayer,
+                colText, " is being executed by ",
+                colAttacker, attackerPlayer,
+                colText, "."
+            )
+
+            surface.PlaySound("outlasttrials/cue/MU_Stinger_TrappedMate.ogg")
+        end
+    end)
 end
