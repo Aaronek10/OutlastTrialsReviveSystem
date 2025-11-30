@@ -197,13 +197,14 @@ if SERVER then
     end
 
 
-    function survivor:SnapToDownedPosition(target, direction, offset, adjust)
+    function survivor:SnapToDownedPosition(target, approachDir, offset, adjust)
         if not IsValid(target) then return end
 
+        approachDir = approachDir or "front"
         offset = offset or 40
         adjust = adjust or 0
-        local approachDir = direction or "front"
 
+        -- inicjalizacja danych snapowania
         if not self.OutlastSnapData then
             self.OutlastSnapData = {
                 forward = target:GetForward(),
@@ -217,41 +218,85 @@ if SERVER then
         local r = self.OutlastSnapData.right
         local targetPos = self.OutlastSnapData.pos
 
-        local desiredPos
+        -- kierunek główny offsetu
+        local mainVec
         if approachDir == "front" then
-            desiredPos = targetPos + f * offset
+            mainVec = f
         elseif approachDir == "back" then
-            desiredPos = targetPos - f * offset
+            mainVec = -f
         elseif approachDir == "left" then
-            desiredPos = targetPos - r * offset
+            mainVec = -r
         elseif approachDir == "right" then
-            desiredPos = targetPos + r * offset
+            mainVec = r
         else
-            desiredPos = targetPos + f * offset
+            mainVec = f
         end
 
-        desiredPos.z = targetPos.z
-        desiredPos = desiredPos + r * adjust
+        -- kierunek adjustu (prostopadły do głównego)
+        local adjustVec
+        if approachDir == "front" or approachDir == "back" then
+            adjustVec = r
+        elseif approachDir == "left" or approachDir == "right" then
+            adjustVec = f
+        end
 
+        -- wyliczenie pozycji docelowej
+        local desiredPos = targetPos + mainVec * offset + adjustVec * adjust
+        desiredPos.z = targetPos.z
         self.OutlastDesiredPos = desiredPos
 
-        local newPos = LerpVector(FrameTime() * 6, self:GetPos(), desiredPos)
+        -- smooth lerp pozycji
+        local lerpSpeed = math.Clamp(FrameTime() * 10, 0, 1)
+        local newPos = LerpVector(lerpSpeed, self:GetPos(), desiredPos)
         self:SetPos(newPos)
 
-        local lookAng = (targetPos - newPos):Angle()
+        -- smooth rotacja w kierunku celu, zabezpieczenie przy bliskiej odległości
+        local dir = (targetPos - desiredPos)
+        dir.z = 0
+        if dir:LengthSqr() < 0.001 then
+            dir = self:GetForward() -- fallback jeśli bardzo blisko
+        end
+        local lookAng = dir:Angle()
         lookAng.p = 0
-        self:SetAngles(LerpAngle(FrameTime() * 10, self:GetAngles(), lookAng))
-        self:SetEyeAngles(lookAng)
+        lookAng.r = 0
 
+        local newAng = LerpAngle(lerpSpeed * 1.5, self:GetAngles(), lookAng)
+        if not timer.Exists("OutlastRotatePlayerSnapping_" .. self:EntIndex()) then
+            timer.Create("OutlastRotatePlayerSnapping_" .. self:EntIndex(), 0.1, 1, function()
+                if IsValid(self) then
+                    self:SetAngles(newAng)
+                    self:SetEyeAngles(newAng)
+                    print("[Snapping Timer] Rotated player during snapping | Previous Ang: " .. tostring(self:GetAngles()) .. " New Ang: " .. tostring(newAng))
+                end
+            end)
+        end
+
+        -- cleanup
         local tname = "DesiredPosOutlastCleanUp_" .. self:EntIndex()
-
         timer.Create(tname, 0.1, 1, function()
             if IsValid(self) then
                 self.OutlastSnapData = nil
                 self.OutlastDesiredPos = nil
             end
         end)
+
+        -- developer debug overlay
+        if GetConVar("developer"):GetInt() >= 1 then
+            local points = {
+                {pos = targetPos + f * offset, name = "front"},
+                {pos = targetPos - f * offset, name = "back"},
+                {pos = targetPos - r * offset, name = "left"},
+                {pos = targetPos + r * offset, name = "right"},
+            }
+
+            for _, p in ipairs(points) do
+                debugoverlay.Sphere(p.pos, 6, 1, Color(0,255,0), true)
+                debugoverlay.Text(p.pos + Vector(0,0,10), p.name, 1, true)
+            end
+        end
     end
+
+
 
 
     function survivor:ResolvePlayerOverlap(target, minDist, tryBoth)
@@ -474,6 +519,15 @@ if SERVER then
             ply:Freeze(false)
         end)
 
+        timer.Create("OutlastPlayerRotateModelAfterFall_" .. ply:EntIndex(), totalTime - 0.75, 1, function()
+            if IsValid(ply) then
+                local lookAng = ply:GetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0))
+                lookAng.p = 0
+                ply:SetAngles(lookAng)
+                ply:SetEyeAngles(lookAng)
+            end
+        end)
+
         return totalTime - 1.725
     end
 
@@ -656,9 +710,9 @@ if SERVER then
                         elseif Direction == "back" then
                             ply:SnapToDownedPosition(ReviveTarget, "back", 60)
                         elseif Direction == "left" then
-                            ply:SnapToDownedPosition(ReviveTarget, "left", 40)
+                            ply:SnapToDownedPosition(ReviveTarget, "left", 40, -10)
                         elseif Direction == "right" then
-                            ply:SnapToDownedPosition(ReviveTarget, "right", 45)
+                            ply:SnapToDownedPosition(ReviveTarget, "right", 45, -3)
                         end
                     end
 
