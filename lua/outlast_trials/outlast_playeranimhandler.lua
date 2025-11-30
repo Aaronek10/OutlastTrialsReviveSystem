@@ -15,6 +15,7 @@ OutlastAnims = {
 
     // Fall animations depending on direction of hit
     fallbackward_end = "player_hitreaction_fall_to_downed_backward_end",
+    fallbackward_end_notrot = "player_hitreaction_fall_to_downed_backward_end_norot",
     fallbackward_start_center_rootmotion = "player_hitreaction_fall_to_downed_backward_start_c",
     fallbackward_start_left_rootmotion = "player_hitreaction_fall_to_downed_backward_start_l",
     fallbackward_start_right_rootmotion  = "player_hitreaction_fall_to_downed_backward_start_r",
@@ -25,11 +26,13 @@ OutlastAnims = {
     fallforward_start_right_rootmotion = "player_hitreaction_fall_to_downed_forward_start_r",
 
     fallleft_end = "player_hitreaction_fall_to_downed_left_end",
+    fallleft_end_notrot = "player_hitreaction_fall_to_downed_left_end_norot",
     fallleft_start_center_rootmotion = "player_hitreaction_fall_to_downed_left_start_c",
     fallleft_start_left_rootmotion = "player_hitreaction_fall_to_downed_left_start_l", 
     fallleft_start_right_rootmotion = "player_hitreaction_fall_to_downed_left_start_r",
     
     fallright_end = "player_hitreaction_fall_to_downed_right_end",
+    fallright_end_notrot = "player_hitreaction_fall_to_downed_right_end_norot",
     fallright_start_center_rootmotion = "player_hitreaction_fall_to_downed_right_start_c", 
     fallright_start_left_rootmotion = "player_hitreaction_fall_to_downed_right_start_l",
     fallright_start_right_rootmotion = "player_hitreaction_fall_to_downed_right_start_r",
@@ -181,7 +184,7 @@ if SERVER then
 
             -- Ustaw aktualną animację
             self:SetSVAnimation(anim, false)
-            self:SetNWBool("SVAnimBlending", true)
+            --self:SetNWBool("SVAnimBlending", true)
 
             index = index + 1
 
@@ -192,13 +195,13 @@ if SERVER then
 
             timer.Create(tname, nextDelay, 1, function()
                 if not IsValid(self) then return end
-                self:SetNWBool("SVAnimBlending", true)
+                --self:SetNWBool("SVAnimBlending", true)
                 PlayNext()
 
                 -- wyłącz blending po krótkim czasie
                 timer.Simple(blendTime, function()
                     if IsValid(self) then
-                        self:SetNWBool("SVAnimBlending", false)
+                        --self:SetNWBool("SVAnimBlending", false)
                     end
                 end)
             end)
@@ -299,9 +302,11 @@ hook.Add("UpdateAnimation", "OutlastTrialsDownedPlayback", function(ply, velocit
         return true
     end
 
+    --[[
     if ply:GetNWBool("SVAnimBlending", false) then
         ply:SetPlaybackRate(0.5)
     end
+    ]]--
 end)
 
 

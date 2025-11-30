@@ -492,7 +492,11 @@ if SERVER then
 
         -- tylko centralne starty
         local startAnim = animPrefix .. "_start_center_rootmotion"
-        local endAnim   = animPrefix .. "_end"
+        local endAnim = animPrefix .. "_end_notrot"
+
+        if animPrefix == "fallforward" then
+            endAnim = animPrefix .. "_end"
+        end
 
         -- wyciąganie z tabeli
         local fStart = OutlastAnims[startAnim]
@@ -519,7 +523,7 @@ if SERVER then
             ply:Freeze(false)
         end)
 
-        timer.Create("OutlastPlayerRotateModelAfterFall_" .. ply:EntIndex(), totalTime - 0.75, 1, function()
+        timer.Create("OutlastPlayerRotateModelAfterFall_" .. ply:EntIndex(), startTime, 1, function()
             if IsValid(ply) then
                 local lookAng = ply:GetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0))
                 lookAng.p = 0
@@ -548,9 +552,14 @@ if SERVER then
         local attacker = dmginfo:GetAttacker()
         local damage = dmginfo:GetDamage()
 
+        if (inflictor:IsWorld() and dmginfo:IsDamageType(DMG_FALL)) or inflictor:GetClass() == "trigger_hurt" then
+            return
+        end
+
         -- Gracz ma paść, ale nie jest jeszcze powalony
         if damage >= ply:Health() and not ply:IsDowned() and not ply.Outlast_IsFallingToDowned then
             dmginfo:SetDamage(0)
+            ply:SetHealth(1)
             ply.Outlast_IsFallingToDowned = true
             ply:SetNWBool("Outlast_IsFalling", true)
             ply.DamageOwner = attacker
