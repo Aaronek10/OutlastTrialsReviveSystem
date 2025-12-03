@@ -506,7 +506,8 @@ if SERVER then
         local endSeq, endTime     = ply:LookupSequence(fEnd)
         local totalTime = startTime + endTime
 
-        ply:StopSVMultiAnimation() // just in case
+        ply:StopSVMultiAnimation() // remove all animations
+        ply:SetSVAnimation("") // ensure that animation is cleared
         ply:SetSVMultiAnimation({fStart, fEnd}, true)
 
         local invertMovement = (animPrefix == "fallright" or animPrefix == "fallleft")
