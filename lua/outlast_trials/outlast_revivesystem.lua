@@ -508,6 +508,7 @@ if SERVER then
 
         ply:StopSVMultiAnimation() // just in case
         ply:SetSVMultiAnimation({fStart, fEnd}, true)
+
         local invertMovement = (animPrefix == "fallright" or animPrefix == "fallleft")
         DoRootMotionLerp(ply, fStart, startTime, 60, invertMovement)
 
