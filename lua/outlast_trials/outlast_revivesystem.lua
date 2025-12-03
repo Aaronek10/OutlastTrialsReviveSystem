@@ -748,7 +748,7 @@ if SERVER then
                 ply:SetActiveWeapon(nil)
             end
 
-            if ply:IsBeingRevived() or ply:IsPlayingSVAnimation() then
+            if ply:IsBeingRevived() or ply:IsFallingToDowned() then
                 ply:Freeze(true)
             else
                 ply:Freeze(false)
