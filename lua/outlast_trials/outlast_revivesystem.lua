@@ -507,12 +507,8 @@ if SERVER then
         local totalTime = startTime + endTime
 
         ply:StopSVMultiAnimation() // just in case
-
-        ply:InvalidateBoneCache()
-        ply:SetupBones()
-        ply:FrameAdvance()
-
         ply:SetSVMultiAnimation({fStart, fEnd}, true)
+
         local invertMovement = (animPrefix == "fallright" or animPrefix == "fallleft")
         DoRootMotionLerp(ply, fStart, startTime, 60, invertMovement)
 
