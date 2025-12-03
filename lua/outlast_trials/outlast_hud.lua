@@ -347,6 +347,7 @@ if CLIENT then
             local colAttacker = Color(200, 50, 50)
             local colWeapon = Color(200, 50, 50)
             local colText = Color(255, 255, 255)
+            attackerPlayer = language.GetPhrase(attackerPlayer)
 
             if attackerPlayer == "" or attackerPlayer == nil then
                 chat.AddText(

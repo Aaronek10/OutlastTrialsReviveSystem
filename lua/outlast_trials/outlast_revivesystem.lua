@@ -639,7 +639,7 @@ if SERVER then
             for _, ply in ipairs(alivePlayers) do
                 if ply:Alive() and ply:IsDowned() and not ply:IsPlayingSVAnimation() and not ply.AllDownedTimerSet then
                     ply:SetBleedoutTime(CurTime() + 1)
-                    print("[OTRS] All players are downed! Forcing bleedout for: " .. ply:Nick())
+                    PrintMessage(HUD_PRINTTALK, "[Outlast Trials] All survivors are downed! Bleedout time accelerated.")
                     timer.Simple(4, function()
                         if IsValid(ply) then
                             ply.AllDownedTimerSet = nil
@@ -748,7 +748,7 @@ if SERVER then
                 ply:SetActiveWeapon(nil)
             end
 
-            if ply:IsBeingRevived() then
+            if ply:IsBeingRevived() or ply:IsPlayingSVAnimation() then
                 ply:Freeze(true)
             else
                 ply:Freeze(false)
@@ -875,6 +875,10 @@ if SERVER then
                 wepName = inflictor:GetPrintName()
             elseif IsValid(attacker) and IsValid(attacker:GetActiveWeapon()) then
                 wepName = attacker:GetActiveWeapon():GetPrintName()
+            elseif IsValid(attacker) and attacker == inflictor then
+                wepName = "himself"
+            else
+                wepName = ""
             end
 
         else
