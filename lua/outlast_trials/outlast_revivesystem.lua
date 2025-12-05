@@ -96,6 +96,9 @@ if SERVER then
         self:SetBleedoutTime(0)
         self:SetHealth(25)
         self:SetNoTarget(false)
+
+        self:SetHull(Vector(-16, -16, 0), Vector(16, 16, 72))
+        self:SetHullDuck(Vector(-16, -16, 0), Vector(16, 16, 36))
     end
 
     function survivor:ResetState()
@@ -109,6 +112,10 @@ if SERVER then
         self:SetBleedoutTime(CurTime() + GetConVar("outlasttrials_bleedout_time"):GetFloat())
         self:SetHealth(100)
         self:SetNoTarget(true)
+
+        -- Hull stojącego gracza: Vector(-16,-16,0), Vector(16,16,72)
+        self:SetHull(Vector(-16, -16, 0), Vector(16, 16, 20)) 
+        self:SetHullDuck(Vector(-16, -16, 0), Vector(16, 16, 20))
     end
 
     function survivor:HandleDownWhenReviving(target)
@@ -511,7 +518,7 @@ if SERVER then
         ply:SetSVMultiAnimation({fStart, fEnd}, true)
 
         local invertMovement = (animPrefix == "fallright" or animPrefix == "fallleft")
-        DoRootMotionLerp(ply, fStart, startTime, 60, invertMovement)
+        timer.Simple(0.1, function() DoRootMotionLerp(ply, fStart, startTime, 60, invertMovement) end)
 
         ply:Freeze(true)
 
@@ -535,10 +542,6 @@ if SERVER then
 
         return totalTime - 1.725
     end
-
-
-
-
 
 
     hook.Add("EntityTakeDamage", "OutlastTrialsReviveSystem_DamageDownedHandler", function(ent, dmginfo)
@@ -655,6 +658,8 @@ if SERVER then
     hook.Add("PlayerDeath", "OutlastTrialsReviveSystem_DeathHandler", function(ply, inflictor, attacker)
         if not GetConVar("outlasttrials_enabled"):GetBool() then return end
         if ply:IsDowned() then
+            ply:SetHull(Vector(-16, -16, 0), Vector(16, 16, 72))
+            ply:SetHullDuck(Vector(-16, -16, 0), Vector(16, 16, 36))
             ply:ResetState()
         end
         RemoveAllOutlastFlags(ply) 
@@ -667,13 +672,10 @@ if SERVER then
             if not IsValid(ply) or not ply:Alive() then return end
 
             //Reviving Section
-            if not ply.RevivingTarget and ply:KeyPressed(IN_USE) and not ply:IsDowned() then
-                local tr = ply:GetEyeTraceNoCursor()
-                local target = tr.Entity
-                --PrintMessage(HUD_PRINTTALK, ply:Nick() .. " is looking at " .. tostring(target) .. " to revive. Approach Direction: " .. GetApproachDirection(ply, target))
-
+            local target = ply:GetEyeTrace().Entity
+            if not ply.RevivingTarget and ply:KeyDown(IN_USE) and not ply:IsDowned() then
                 if IsValid(target) and target:IsPlayer() and target:IsDowned() and not (target:GetBleedoutTime() <= 0) then
-                    if target:GetPos():DistToSqr(ply:GetPos()) < 10000 then 
+                    if ply:GetPos():DistToSqr(target:GetPos()) < 10000 then 
                         target:SetNWEntity("Outlast_Reviver", ply)
                         ply:SetNWEntity("Outlast_RevivingTarget", target)
                         target:SetNWFloat("Outlast_ReviveStartTime", CurTime())
@@ -748,6 +750,7 @@ if SERVER then
                 ply:SetActiveWeapon(nil)
             end
 
+            // Freeze player when being revived or falling to downed state
             if ply:IsBeingRevived() or ply:IsFallingToDowned() then
                 ply:Freeze(true)
             else
