@@ -66,9 +66,30 @@ end
 
 hook.Add("SetupMove", "OutlastTrialsReviveSystem_DownedMoveHandler", function(ply, mv, cmd)
     if not GetConVar("outlasttrials_enabled"):GetBool() then return end
+    if ply:IsReviving() or ply:IsBeingRevived() then
+        local buttons = mv:GetButtons()
+        local blockedActions = {
+            IN_FORWARD,
+            IN_BACK,
+            IN_MOVELEFT,
+            IN_MOVERIGHT,
+            IN_JUMP
+        }
+        for _, action in ipairs(blockedActions) do
+            if mv:KeyDown(action) then
+                cmd:SetForwardMove(0)
+                cmd:SetSideMove(0)
+                cmd:SetUpMove(0)
+            end
+        end
+    end
+
     if ply:IsDowned() then
         mv:SetMaxSpeed(15)
         mv:SetMaxClientSpeed(15)
+        if mv:KeyDown(IN_JUMP) then
+            mv:SetButtons(bit.band(mv:GetButtons(), bit.bnot(IN_JUMP)))
+        end
     end
 end)
 
@@ -518,7 +539,7 @@ if SERVER then
         ply:SetSVMultiAnimation({fStart, fEnd}, true)
 
         local invertMovement = (animPrefix == "fallright" or animPrefix == "fallleft")
-        timer.Simple(0.1, function() DoRootMotionLerp(ply, fStart, startTime, 60, invertMovement) end)
+        timer.Simple(0.15, function() DoRootMotionLerp(ply, fStart, startTime, 60, invertMovement) end)
 
         ply:Freeze(true)
 
@@ -542,6 +563,26 @@ if SERVER then
 
         return totalTime - 1.725
     end
+
+    local function PlayReviveInterrupt(ply, target, direction, progress)
+        if not IsValid(target) then return end
+
+        local ReviveInterruptAnims = {
+            front = {low = OutlastAnims.getup_front_interupt_low, high = OutlastAnims.getup_front_interupt_high},
+            back  = {low = OutlastAnims.getup_back_interupt_low,  high = OutlastAnims.getup_back_interupt_high},
+            left  = {low = OutlastAnims.getup_left_interupt_low,  high = OutlastAnims.getup_left_interupt_high},
+            right = {low = OutlastAnims.getup_right_interupt_low, high = OutlastAnims.getup_right_interupt_high},
+        }
+
+        local variant = (progress >= 0.5) and "high" or "low"
+        local anim = ReviveInterruptAnims[direction][variant]
+        if anim then print ("[Outlast Trials] Playing revive interrupt animation: " .. anim) end
+
+        target:StopSVMultiAnimation()
+        target:SetSVAnimation("", true)
+        target:SetSVAnimation(anim, true)
+    end
+
 
 
     hook.Add("EntityTakeDamage", "OutlastTrialsReviveSystem_DamageDownedHandler", function(ent, dmginfo)
@@ -743,6 +784,21 @@ if SERVER then
                     ResetOutlastReviveFlags(ply, ReviveTarget)
                     ply:ResolvePlayerOverlap(ReviveTarget, 40, false)
                     ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
+
+                    local reviver = ply
+                    local target = ReviveTarget
+
+                    -- Tylko jeśli target jeszcze leży
+                    if IsValid(target) and target:IsDowned() then
+                        local direction = GetApproachDirection(reviver, target)
+
+                        -- progress w momencie przerwania
+                        local reviveTime = 5
+                        local elapsed = CurTime() - target:GetNWFloat("Outlast_ReviveStartTime", CurTime())
+                        local progress = math.Clamp(elapsed / reviveTime, 0, 1)
+
+                        PlayReviveInterrupt(reviver, target, direction, progress)
+                    end
                 end
             end
 
@@ -751,7 +807,7 @@ if SERVER then
             end
 
             // Freeze player when being revived or falling to downed state
-            if ply:IsBeingRevived() or ply:IsFallingToDowned() then
+            if ply:IsBeingRevived() or ply:IsFallingToDowned() or ply:IsBeingExecuted() or ply:IsExecuting() then
                 ply:Freeze(true)
             else
                 ply:Freeze(false)
@@ -761,6 +817,11 @@ if SERVER then
             if ply:IsDowned() and ply:KeyDown(IN_DUCK) then
                 local bleedoutTime = ply:GetBleedoutTime()
                 ply:SetBleedoutTime(CurTime() + bleedoutTime - (FrameTime() * 10))
+            end
+
+            if ply:WaterLevel() >= 2 and ply:IsDowned() then
+                local bleedoutTime = ply:GetBleedoutTime()
+                ply:SetBleedoutTime(CurTime() + bleedoutTime - (FrameTime() * 20))
             end
 
             //Executions Section
@@ -813,7 +874,7 @@ if SERVER then
                     ply.StartedExecution = true
                 else
                     //Snapping
-                    if CurTime() - ply.ExecStart <= 2 then
+                    if CurTime() - ply.ExecStart <= 2.5 then
                         local ExecDirection = GetApproachDirection(ply, ExecTarget)
                         local VictimAngle = (ExecTarget:GetPos() - ply:GetPos()):Angle()
                         VictimAngle.p = 0
@@ -834,7 +895,7 @@ if SERVER then
 
                     if CurTime() - ply.ExecStart >= (ply.ExecTime or 0) then
                         if IsValid(ExecTarget) and ExecTarget:Alive() and ExecTarget:IsDowned() then
-                            ExecTarget:TakeDamage(ExecTarget:Health(), ply, ply)
+                            ExecTarget:TakeDamage(ExecTarget:GetMaxHealth(), ply, ply)
                         end
                         
                         ply:Freeze(false)

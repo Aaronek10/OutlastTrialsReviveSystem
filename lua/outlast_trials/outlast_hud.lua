@@ -295,29 +295,6 @@ if CLIENT then
         end
     end)
 
-    hook.Add("SetupMove", "Outlast_BlockInputs", function(ply, mv)
-        if ply:IsReviving() or ply:IsBeingRevived() then
-            local buttons = mv:GetButtons()
-
-            -- Zablokuj ruch i skok
-            buttons = bit.band(buttons, bit.bnot(IN_FORWARD))
-            buttons = bit.band(buttons, bit.bnot(IN_BACK))
-            buttons = bit.band(buttons, bit.bnot(IN_MOVELEFT))
-            buttons = bit.band(buttons, bit.bnot(IN_MOVERIGHT))
-            buttons = bit.band(buttons, bit.bnot(IN_JUMP))
-            buttons = bit.band(buttons, bit.bnot(IN_SPEED))
-
-            mv:SetButtons(buttons)
-            mv:SetVelocity(Vector(0,0,0)) -- blokuje fizyczny ruch
-        end
-
-        if ply:IsDowned() then
-            local buttons = mv:GetButtons()
-            buttons = bit.band(buttons, bit.bnot(IN_JUMP)) -- usuwa tylko skok
-            mv:SetButtons(buttons)
-        end
-    end)
-
     net.Receive("OutlastTrialsReviveSystem_Notify", function()
         local downedPlayer = net.ReadString()
         local attackerPlayer = net.ReadString()

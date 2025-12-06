@@ -37,6 +37,8 @@ OutlastAnims = {
     fallright_start_left_rootmotion = "player_hitreaction_fall_to_downed_right_start_l",
     fallright_start_right_rootmotion = "player_hitreaction_fall_to_downed_right_start_r",
 
+
+
     // Downed getting up animations
     getup_phase1_back = "player_helpup_follower_entry_back",
     getup_phase2_back = "player_helpup_follower_try_back",
@@ -53,6 +55,20 @@ OutlastAnims = {
     getup_phase1_right = "player_helpup_follower_entry_right",
     getup_phase2_right = "player_helpup_follower_try_right",
     getup_phase3_right = "player_helpup_follower_success_right",
+
+
+    //Get-up interupt animations
+    getup_front_interupt_low = "player_helpup_follower_drop_front_low",
+    getup_front_interupt_high = "player_helpup_follower_drop_front_high",
+
+    getup_back_interupt_low = "player_helpup_follower_drop_back_low",
+    getup_back_interupt_high = "player_helpup_follower_drop_back_high",
+
+    getup_left_interupt_low = "player_helpup_follower_drop_left_low",
+    getup_left_interupt_high = "player_helpup_follower_drop_left_high",
+
+    getup_right_interupt_low = "player_helpup_follower_drop_right_low",
+    getup_right_interupt_high = "player_helpup_follower_drop_right_high",
 
     //Reviver helping up animations
     helpup_phase1_back = "player_helpup_leader_entry_back",
@@ -313,11 +329,6 @@ end)
 
 hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fov)
     local viewply = ply
-    if not IsValid(viewply) or not viewply:IsPlayer() then
-        viewply = LocalPlayer()
-        if not IsValid(viewply) or not viewply:IsPlayer() then return end
-    end
-
     local isDowned = (type(viewply.IsDowned) == "function" and viewply:IsDowned())
     local isReviving = (type(viewply.IsReviving) == "function" and viewply:IsReviving())
     local isBeingRevived = (type(viewply.IsBeingRevived) == "function" and viewply:IsBeingRevived())
@@ -382,6 +393,7 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     if table.HasValue(fixedcamtable, viewply:GetNWString("SVAnim", "")) then
         PlyAng = attLoc.Ang
         PlyOrigin = attLoc.Pos
+        --chat.AddText("Fixed Cam Applied for animation: " .. viewply:GetNWString("SVAnim", ""))
         if ReviveProgress > 0.8 and isDowned then
             local t = math.Clamp((ReviveProgress - 0.8) / 0.2, 0, 1)
             local targetPos = viewply:EyePos()
