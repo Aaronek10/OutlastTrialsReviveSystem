@@ -361,7 +361,7 @@ if CLIENT then
                 colText, "."
             )
 
-            surface.PlaySound("outlasttrials/cue/MU_Stinger_TrappedMate.ogg")
+            surface.PlaySound("outlasttrials/cue/MU_Stinger_TargetedMate.ogg")
         end
     end)
 end

@@ -884,9 +884,9 @@ if SERVER then
                         if ExecDirection == "front" then
                             ply:SnapToDownedPosition(ExecTarget, "front", 40)
                         elseif ExecDirection == "back" then
-                            ply:SnapToDownedPosition(ExecTarget, "back", 60)
+                            ply:SnapToDownedPosition(ExecTarget, "back", 65, -0)
                         elseif ExecDirection == "left" then
-                            ply:SnapToDownedPosition(ExecTarget, "left", 40)
+                            ply:SnapToDownedPosition(ExecTarget, "left", 35, -5)
                         elseif ExecDirection == "right" then
                             ply:SnapToDownedPosition(ExecTarget, "right", 40)
                         end
