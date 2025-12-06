@@ -64,7 +64,7 @@ function survivor:IsFallingToDowned()
     return self:GetNWBool("Outlast_IsFalling", false)
 end
 
-hook.Add("SetupMove", "OutlastTrialsReviveSystem_DownedMoveHandler", function(ply, mv, cmd)
+hook.Add("SetupMove", "zzzzzz_OutlastTrialsReviveSystem_DownedMoveHandler", function(ply, mv, cmd)
     if not GetConVar("outlasttrials_enabled"):GetBool() then return end
     if ply:IsReviving() or ply:IsBeingRevived() then
         local buttons = mv:GetButtons()
@@ -77,9 +77,8 @@ hook.Add("SetupMove", "OutlastTrialsReviveSystem_DownedMoveHandler", function(pl
         }
         for _, action in ipairs(blockedActions) do
             if mv:KeyDown(action) then
-                cmd:SetForwardMove(0)
-                cmd:SetSideMove(0)
-                cmd:SetUpMove(0)
+                mv:SetMaxSpeed(0)
+                mv:SetMaxClientSpeed(0)
             end
         end
     end
