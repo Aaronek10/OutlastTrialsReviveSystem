@@ -197,6 +197,79 @@ if SERVER then
         //Something broke? KYS! IT'S THAT SIMPLE!
     end
 
+    local function GetExecutionFromView(ply)
+        local tr = ply:GetEyeTraceNoCursor()
+        if not IsValid(tr.Entity) then return end
+
+        local ent = tr.Entity
+
+        -- Szukamy VICTIM
+        if ent:IsPlayer() and ent:IsDowned() then
+            local attacker = ent:GetNWEntity("Outlast_Impostor")
+            if IsValid(attacker) and attacker.StartedExecution then
+                return attacker, ent
+            end
+        end
+
+        -- Szukamy ATTACKERA
+        if ent:IsPlayer() and ent.StartedExecution then
+            local victim = ent.ExecTarget
+            if IsValid(victim) then
+                return ent, victim
+            end
+        end
+    end
+
+    local function InterruptExecution(interrupter, attacker, victim)
+        if not (IsValid(attacker) and IsValid(victim)) then return end
+
+        -- Przerwij animacje
+        attacker:StopSVMultiAnimation()
+        attacker:SetSVAnimation("")
+
+        victim:StopSVMultiAnimation()
+        victim:SetSVAnimation("")
+
+        attacker:Freeze(false)
+        victim:Freeze(false)
+
+        -- Odepchnięcie ATTACKERA
+        local pushDir = (attacker:GetPos() - interrupter:GetPos())
+        pushDir.z = 0
+        pushDir:Normalize()
+
+        local phys = attacker:GetPhysicsObject()
+        if IsValid(phys) then
+            timer.Simple(0.2, function() phys:SetVelocity(pushDir * 1000 + Vector(0,0,150)) end)
+        else
+            timer.Simple(0.2, function() attacker:SetVelocity(pushDir * 1000 + Vector(0,0,150)) end)
+        end
+        attacker:ViewPunch(Angle(-10, math.Rand(-5,5), 0))
+
+        -- Reset egzekucji
+        attacker.StartedExecution = false
+        attacker.ExecTarget = nil
+        attacker.ExecStart = nil
+        attacker.ExecDirection = nil
+        attacker.ExecTime = nil
+
+        attacker:SetNWEntity("Outlast_ImpostorVictim", NULL)
+        victim:SetNWEntity("Outlast_Impostor", NULL)
+
+        interrupter.KickedAttacker = true
+        timer.Simple(1, function() 
+            if IsValid(interrupter) then
+                interrupter.KickedAttacker = nil
+            end
+        end)
+        interrupter:SetSVAnimation(OutlastAnims.helper_kick, true)
+
+        attacker:ApplyEffect("Stunned", 3)
+        attacker:TakeDamage(5, interrupter, interrupter)
+    end
+
+
+
     local function GetApproachDirection(reviver, downed)
         local toReviver = (reviver:GetPos() - downed:GetPos())
         toReviver.z = 0
@@ -575,7 +648,7 @@ if SERVER then
 
         local variant = (progress >= 0.5) and "high" or "low"
         local anim = ReviveInterruptAnims[direction][variant]
-        if anim then print ("[Outlast Trials] Playing revive interrupt animation: " .. anim) end
+        --if anim then print ("[Outlast Trials] Playing revive interrupt animation: " .. anim) end
 
         target:StopSVMultiAnimation()
         target:SetSVAnimation("", true)
@@ -592,13 +665,25 @@ if SERVER then
         if not ply:Alive() then return end
 
         local inflictor = dmginfo:GetInflictor()
-        local damagePos = IsValid(inflictor) and inflictor:GetPos() or dmginfo:GetAttacker():GetPos()
-        local attacker = dmginfo:GetAttacker()
+        local attacker  = dmginfo:GetAttacker()
+
+        local damagePos
+        if IsValid(inflictor) then
+            damagePos = inflictor:GetPos()
+        elseif IsValid(attacker) then
+            damagePos = attacker:GetPos()
+        else
+            damagePos = dmginfo:GetDamagePosition()
+        end
+
         local damage = dmginfo:GetDamage()
 
-        if (inflictor:IsWorld() and dmginfo:IsDamageType(DMG_FALL)) or inflictor:GetClass() == "trigger_hurt" then
+        if dmginfo:IsDamageType(DMG_FALL) then return end
+
+        if IsValid(inflictor) and inflictor:GetClass() == "trigger_hurt" then
             return
         end
+
 
         -- Gracz ma paść, ale nie jest jeszcze powalony
         if damage >= ply:Health() and not ply:IsDowned() and not ply.Outlast_IsFallingToDowned then
@@ -681,8 +766,8 @@ if SERVER then
         if allDowned then
             for _, ply in ipairs(alivePlayers) do
                 if ply:Alive() and ply:IsDowned() and not ply:IsPlayingSVAnimation() and not ply.AllDownedTimerSet then
-                    ply:SetBleedoutTime(CurTime() + 1)
-                    PrintMessage(HUD_PRINTTALK, "[Outlast Trials] All survivors are downed! Bleedout time accelerated.")
+                    ply:SetBleedoutTime(CurTime() + 0.1)
+                    --PrintMessage(HUD_PRINTTALK, "[Outlast Trials] All survivors are downed! Bleedout time accelerated.")
                     timer.Simple(4, function()
                         if IsValid(ply) then
                             ply.AllDownedTimerSet = nil
@@ -713,8 +798,8 @@ if SERVER then
 
             //Reviving Section
             local target = ply:GetEyeTrace().Entity
-            if not ply.RevivingTarget and ply:KeyDown(IN_USE) and not ply:IsDowned() then
-                if IsValid(target) and target:IsPlayer() and target:IsDowned() and not (target:GetBleedoutTime() <= 0) then
+            if not ply.RevivingTarget and ply:KeyDown(IN_USE) and not ply:IsDowned() and not ply.KickedAttacker then
+                if IsValid(target) and target:IsPlayer() and target:IsDowned() and not (target:GetBleedoutTime() <= 0 or target:IsBeingExecuted()) then
                     if ply:GetPos():DistToSqr(target:GetPos()) < 10000 then 
                         target:SetNWEntity("Outlast_Reviver", ply)
                         ply:SetNWEntity("Outlast_RevivingTarget", target)
@@ -776,13 +861,17 @@ if SERVER then
                     if progress >= 1 then
                         ReviveTarget:Revive()
                         ResetOutlastReviveFlags(ply, ReviveTarget)
-                        ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
+                        if IsValid(ply.Outlast_UnequipedWeapon) then
+                            ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
+                        end
                         hook.Run("Outlast_PlayerRevived", ply, ReviveTarget)
                     end
                 else
                     ResetOutlastReviveFlags(ply, ReviveTarget)
                     ply:ResolvePlayerOverlap(ReviveTarget, 40, false)
-                    ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
+                    if IsValid(ply.Outlast_UnequipedWeapon) then
+                        ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
+                    end
 
                     local reviver = ply
                     local target = ReviveTarget
@@ -915,6 +1004,18 @@ if SERVER then
                     end
                 end
             end
+
+            -- === EXECUTION INTERRUPT ===
+            if ply:KeyPressed(IN_USE) and not ply:IsDowned() then
+                local attacker, victim = GetExecutionFromView(ply)
+
+                if IsValid(attacker) and IsValid(victim) then
+                    if ply:GetPos():DistToSqr(attacker:GetPos()) <= 10000 then
+                        InterruptExecution(ply, attacker, victim)
+                    end
+                end
+            end
+
         end
     end)
 

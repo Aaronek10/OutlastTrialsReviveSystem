@@ -96,7 +96,10 @@ OutlastAnims = {
     victim_back = "Player_PVP_Downed_Murder_01_Back",
     victim_front = "Player_PVP_Downed_Murder_01_Front",
     victim_left = "Player_PVP_Downed_Murder_01_Left",
-    victim_right = "Player_PVP_Downed_Murder_01_Right"
+    victim_right = "Player_PVP_Downed_Murder_01_Right",
+
+    //shove
+    helper_kick = "player_male_shove_npc"
 }
 
 
