@@ -2,6 +2,9 @@ survivor = FindMetaTable("Player")
 
 CreateConVar("outlasttrials_enabled", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Enable or disable the Outlast Trials Revive System.")
 CreateConVar("outlasttrials_bleedout_time", "60", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Time in seconds before a downed player bleeds out and dies.")
+CreateConVar("outlasttrials_teamwipe_on_all_downed", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "If all players are downed, everybody dies.")
+CreateConVar("outlasttrials_enable_execution", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Enable or disable the execution mechanic.")
+CreateConVar("outlasttrials_player_damage_when_downed", "0", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "If enabled, downed players can take damage.")
 
 function survivor:IsDowned()
     return self:GetNWBool("Outlast_IsDowned", false)
@@ -66,31 +69,35 @@ end
 
 hook.Add("SetupMove", "zzzzzz_OutlastTrialsReviveSystem_DownedMoveHandler", function(ply, mv, cmd)
     if not GetConVar("outlasttrials_enabled"):GetBool() then return end
-    if ply:IsReviving() or ply:IsBeingRevived() then
-        local buttons = mv:GetButtons()
-        local blockedActions = {
-            IN_FORWARD,
-            IN_BACK,
-            IN_MOVELEFT,
-            IN_MOVERIGHT,
-            IN_JUMP
-        }
-        for _, action in ipairs(blockedActions) do
-            if mv:KeyDown(action) then
-                mv:SetMaxSpeed(0)
-                mv:SetMaxClientSpeed(0)
-            end
-        end
+
+    if ply:IsReviving() or ply:IsBeingRevived() or ply:IsExecuting() or ply:IsBeingExecuted() then
+        mv:SetMaxClientSpeed(0)
+        mv:SetMaxSpeed(0)
+        mv:SetForwardSpeed(0)
+        mv:SetSideSpeed(0)
+        mv:SetUpSpeed(0)
+        mv:SetVelocity(Vector(0, 0, 0))
     end
 
     if ply:IsDowned() then
         mv:SetMaxSpeed(15)
         mv:SetMaxClientSpeed(15)
+
+        local buttons = mv:GetButtons()
+        buttons = bit.band(buttons, bit.bnot(IN_FORWARD))
+        buttons = bit.band(buttons, bit.bnot(IN_BACK))
+        buttons = bit.band(buttons, bit.bnot(IN_MOVELEFT))
+        buttons = bit.band(buttons, bit.bnot(IN_MOVERIGHT))
+        buttons = bit.band(buttons, bit.bnot(IN_JUMP))
+
+        mv:SetButtons(buttons)
+        
         if mv:KeyDown(IN_JUMP) then
             mv:SetButtons(bit.band(mv:GetButtons(), bit.bnot(IN_JUMP)))
         end
     end
 end)
+
 
 if SERVER then
 
@@ -299,6 +306,7 @@ if SERVER then
 
     function survivor:SnapToDownedPosition(target, approachDir, offset, adjust)
         if not IsValid(target) then return end
+        if self:GetVelocity():LengthSqr() > 1 then self:SetVelocity(-self:GetVelocity()) end
 
         approachDir = approachDir or "front"
         offset = offset or 40
@@ -678,8 +686,6 @@ if SERVER then
 
         local damage = dmginfo:GetDamage()
 
-        if dmginfo:IsDamageType(DMG_FALL) then return end
-
         if IsValid(inflictor) and inflictor:GetClass() == "trigger_hurt" then
             return
         end
@@ -726,7 +732,7 @@ if SERVER then
                 end
 
                 local timeLeft = ply:GetBleedoutTime()
-                if timeLeft <= 0 and not ply:IsBeingRevived() then
+                if timeLeft <= 0 and not (ply:IsBeingRevived() or ply:IsBeingExecuted()) then
                     if not ply.PlayingDeathAnim then
                         ply:SetSVAnimation(OutlastAnims.downeddeath, true)
                         ply:Freeze(true)
@@ -868,7 +874,7 @@ if SERVER then
                     end
                 else
                     ResetOutlastReviveFlags(ply, ReviveTarget)
-                    ply:ResolvePlayerOverlap(ReviveTarget, 40, false)
+                    ply:ResolvePlayerOverlap(ReviveTarget, 45, false)
                     if IsValid(ply.Outlast_UnequipedWeapon) then
                         ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
                     end
@@ -1016,6 +1022,19 @@ if SERVER then
                 end
             end
 
+        end
+    end)
+
+    hook.Add("ShouldCollide", "OutlastTrialsReviveSystem_CollisionHandler", function(ent1, ent2)
+        if not GetConVar("outlasttrials_enabled"):GetBool() then return end
+        if not IsValid(ent1) or not IsValid(ent2) then return end
+        if not ent1:IsPlayer() or not ent2:IsPlayer() then return end
+
+        local ply1 = ent1
+        local ply2 = ent2
+
+        if (ply1:IsBeingRevived() or ply1:IsReviving() or ply1:IsExecuting() or ply1:IsBeingExecuted()) and (ply2:IsBeingRevived() or ply2:IsReviving() or ply2:IsExecuting() or ply2:IsBeingExecuted()) then
+            return false
         end
     end)
 
