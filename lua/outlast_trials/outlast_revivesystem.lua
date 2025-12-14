@@ -966,8 +966,13 @@ if SERVER then
                     ExecTarget:Freeze(true)
                     ply:SetActiveWeapon(nil)
                     ply.StartedExecution = true
+
+                    //Set attacker pos and angle to be the same as victim
+                    ply:SetPos(ExecTarget:GetPos())
+                    ply:SetAngles(ExecTarget:GetAngles())
                 else
                     //Snapping
+                    --[[
                     if CurTime() - ply.ExecStart <= 2.5 then
                         local ExecDirection = GetApproachDirection(ply, ExecTarget)
                         local VictimAngle = (ExecTarget:GetPos() - ply:GetPos()):Angle()
@@ -986,6 +991,7 @@ if SERVER then
                         end
 
                     end
+                    ]]--
 
                     if CurTime() - ply.ExecStart >= (ply.ExecTime or 0) then
                         if IsValid(ExecTarget) and ExecTarget:Alive() and ExecTarget:IsDowned() then
