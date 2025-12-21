@@ -509,11 +509,6 @@ if SERVER then
         local stepTime    = duration / steps
         local moveDir = perStep:GetNormalized()
 
-        if moveDir:LengthSqr() > 0.0001 then
-            local targetAng = moveDir:Angle()
-            ent:SetNWAngle("Outlast_AfterFallAngle", targetAng)
-        end
-
         local timerID = "OutlastRM_" .. ent:EntIndex()
 
         timer.Create(timerID, stepTime, steps, function()
@@ -570,10 +565,13 @@ if SERVER then
 
         if angle >= -45 and angle <= 45 then
             animPrefix = "fallbackward"  -- przód
+            ply:SetNWAngle("Outlast_AfterFallAngle", (modelAng + Angle(0,180,0)), modelAng)
         elseif angle > 45 and angle < 135 then
             animPrefix = "fallleft"    -- prawo
+            ply:SetNWAngle("Outlast_AfterFallAngle", (modelAng + Angle(0,-90,0)), modelAng)
         elseif angle < -45 and angle > -135 then
             animPrefix = "fallright"     -- lewo
+            ply:SetNWAngle("Outlast_AfterFallAngle", (modelAng + Angle(0,90,0)), modelAng)
         else
             animPrefix = "fallforward" -- tył
         end
@@ -603,23 +601,20 @@ if SERVER then
 
         ply:Freeze(true)
 
-        timer.Create("OutlastPlayerFallAnimUnfreeze_" .. ply:EntIndex(), totalTime, 1, function()
-            timer.Simple(0.725, function()
-                if IsValid(ply) then
-                    ply:SetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0))
-                end
-            end)
+        timer.Create("OutlastPlayerFallAnimEnd_" .. ply:EntIndex(), startTime, 1, function()
+            if not IsValid(ply) then return end
+
             ply:Freeze(false)
+            local finalAng = ply:GetNWAngle("Outlast_AfterFallAngle", ply:GetAngles())
+            finalAng.p = 0
+            finalAng.r = 0
+
+            ply:SetAngles(finalAng)
+            ply:SetEyeAngles(finalAng)
+
+            PrintMessage(HUD_PRINTTALK, "[Outlast Trials] Rotated player after fall animation | New Ang: " .. tostring(finalAng))
         end)
 
-        timer.Create("OutlastPlayerRotateModelAfterFall_" .. ply:EntIndex(), startTime, 1, function()
-            if IsValid(ply) then
-                local lookAng = ply:GetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0))
-                lookAng.p = 0
-                ply:SetAngles(lookAng)
-                ply:SetEyeAngles(lookAng)
-            end
-        end)
 
         return totalTime - 1.725
     end
