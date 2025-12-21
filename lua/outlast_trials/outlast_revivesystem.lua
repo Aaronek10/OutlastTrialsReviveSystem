@@ -613,7 +613,7 @@ if SERVER then
             ply:SetEyeAngles(finalAng)
             ply:Freeze(true)
 
-            PrintMessage(HUD_PRINTTALK, "[Outlast Trials] Rotated player after fall animation | New Ang: " .. tostring(finalAng))
+            --PrintMessage(HUD_PRINTTALK, "[Outlast Trials] Rotated player after fall animation | New Ang: " .. tostring(finalAng))
         end)
 
         timer.Create("OutlastPlayerFallAnimTotalEnd_" .. ply:EntIndex(), totalTime, 1, function()
