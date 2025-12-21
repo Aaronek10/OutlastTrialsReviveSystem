@@ -340,7 +340,6 @@ if SERVER then
             mainVec = f
         end
 
-        -- kierunek adjustu (prostopadły do głównego)
         local adjustVec
         if approachDir == "front" or approachDir == "back" then
             adjustVec = r
@@ -348,21 +347,18 @@ if SERVER then
             adjustVec = f
         end
 
-        -- wyliczenie pozycji docelowej
         local desiredPos = targetPos + mainVec * offset + adjustVec * adjust
         desiredPos.z = targetPos.z
         self.OutlastDesiredPos = desiredPos
 
-        -- smooth lerp pozycji
         local lerpSpeed = math.Clamp(FrameTime() * 10, 0, 1)
         local newPos = LerpVector(lerpSpeed, self:GetPos(), desiredPos)
         self:SetPos(newPos)
 
-        -- smooth rotacja w kierunku celu, zabezpieczenie przy bliskiej odległości
         local dir = (targetPos - desiredPos)
         dir.z = 0
         if dir:LengthSqr() < 0.001 then
-            dir = self:GetForward() -- fallback jeśli bardzo blisko
+            dir = self:GetForward()
         end
         local lookAng = dir:Angle()
         lookAng.p = 0
@@ -492,43 +488,32 @@ if SERVER then
     function DoRootMotionLerp(ent, sequenceName, duration, steps, invertMovement)
         if not IsValid(ent) then return end
 
-        -- Pobranie sekwencji
         local seq, seqDur = ent:LookupSequence(sequenceName)
         if seq < 0 then return end
 
-        -- Pobranie root-motion z animacji
         local ok, deltaPos, deltaAng = ent:GetSequenceMovement(seq, 0, seqDur)
         if not ok then return end
 
-        -- Odwracanie rootmotion dla left/right
         if invertMovement then
             deltaPos = deltaPos * -1
         end
 
-        -- Konwersja offsetu sekwencji na światowe delta
         local ang = ent:GetAngles()
         local worldDelta =
             ang:Forward() * deltaPos.x +
             ang:Right()   * deltaPos.y +
             ang:Up()      * deltaPos.z
 
-        -- Lerp per-step
         local perStep     = worldDelta / steps
         local perStepAng  = deltaAng  / steps
         local stepTime    = duration / steps
-
-        -- === NOWE: kierunek ruchu i NWAngle ===
         local moveDir = perStep:GetNormalized()
 
-        -- Jeżeli deltaPos jest zerowe (niektóre animacje tak mają), unikamy invalid angle
         if moveDir:LengthSqr() > 0.0001 then
             local targetAng = moveDir:Angle()
             ent:SetNWAngle("Outlast_AfterFallAngle", targetAng)
         end
 
-        --------------------------------------------------------------------------
-        -- Timer wykonujący root-motion krok po kroku
-        --------------------------------------------------------------------------
         local timerID = "OutlastRM_" .. ent:EntIndex()
 
         timer.Create(timerID, stepTime, steps, function()
@@ -540,11 +525,8 @@ if SERVER then
             local startPos = ent:GetPos()
             local targetPos = startPos + perStep
 
-            -- Collision bounds
             local mins = ent:OBBMins()
             local maxs = ent:OBBMaxs()
-
-            -- TraceHull aby nie wejść w ściany/NPC/propy/graczy
             local tr = util.TraceHull({
                 start  = startPos,
                 endpos = targetPos,
@@ -554,12 +536,10 @@ if SERVER then
             })
 
             if tr.Hit then
-                -- Zatrzymujemy animację ruchu
                 timer.Remove(timerID)
                 return
             end
 
-            -- Ustawiamy nową pozycję i obrót
             ent:SetPos(tr.HitPos)
             ent:SetAngles(ent:GetAngles() + perStepAng)
         end)
@@ -714,6 +694,13 @@ if SERVER then
             return true
         end
 
+        if ply:IsDowned() and not ply:IsBeingExecuted() and not (ply:GetBleedoutTime() <= 0) then
+            if not GetConVar("outlasttrials_player_damage_when_downed"):GetBool() then
+                dmginfo:SetDamage(0)
+                return true
+            end
+        end
+
         if ply.Outlast_IsFallingToDowned then
             return true
         end
@@ -737,7 +724,7 @@ if SERVER then
                         ply:SetSVAnimation(OutlastAnims.downeddeath, true)
                         ply:Freeze(true)
 
-                        timer.Simple(3, function()
+                        timer.Create("OutlastPlayerDeathAnim_" .. ply:EntIndex(), 3, 1, function()
                             if IsValid(ply) then
                                 ply:SetPos(ply:GetPos() + Vector(0,0,5))
                                 ply:TakeDamage(ply:Health(), ply.DamageOwner or game.GetWorld(), ply)
@@ -752,34 +739,37 @@ if SERVER then
             end
         end
 
-        local alivePlayers = {}
-        for _, ply in ipairs(players) do
-            if ply:Alive() then
-                table.insert(alivePlayers, ply)
+        -- Teamwipe on all downed players
+        if GetConVar("outlasttrials_teamwipe_on_all_downed"):GetBool() then
+            local alivePlayers = {}
+            for _, ply in ipairs(players) do
+                if ply:Alive() then
+                    table.insert(alivePlayers, ply)
+                end
             end
-        end
 
-        if #alivePlayers == 0 then return end
+            if #alivePlayers == 0 then return end
 
-        local allDowned = true
-        for _, ply in ipairs(alivePlayers) do
-            if not ply:IsDowned() then
-                allDowned = false
-                break
-            end
-        end
-
-        if allDowned then
+            local allDowned = true
             for _, ply in ipairs(alivePlayers) do
-                if ply:Alive() and ply:IsDowned() and not ply:IsPlayingSVAnimation() and not ply.AllDownedTimerSet then
-                    ply:SetBleedoutTime(CurTime() + 0.1)
-                    --PrintMessage(HUD_PRINTTALK, "[Outlast Trials] All survivors are downed! Bleedout time accelerated.")
-                    timer.Simple(4, function()
-                        if IsValid(ply) then
-                            ply.AllDownedTimerSet = nil
-                        end
-                    end)
-                    ply.AllDownedTimerSet = true
+                if not ply:IsDowned() then
+                    allDowned = false
+                    break
+                end
+            end
+
+            if allDowned then
+                for _, ply in ipairs(alivePlayers) do
+                    if ply:Alive() and ply:IsDowned() and not ply:IsPlayingSVAnimation() and not ply.AllDownedTimerSet then
+                        ply:SetBleedoutTime(CurTime() + 0.1)
+                        --PrintMessage(HUD_PRINTTALK, "[Outlast Trials] All survivors are downed! Bleedout time accelerated.")
+                        timer.Simple(4, function()
+                            if IsValid(ply) then
+                                ply.AllDownedTimerSet = nil
+                            end
+                        end)
+                        ply.AllDownedTimerSet = true
+                    end
                 end
             end
         end
@@ -919,22 +909,25 @@ if SERVER then
             end
 
             //Executions Section
-            if not ply.ExecTarget and ply:KeyPressed(IN_RELOAD) and not ply:IsDowned() then
-                local tr = ply:GetEyeTraceNoCursor()
-                local target = tr.Entity
-                local ExecDirection = GetApproachDirection(ply, target)
+            if GetConVar("outlasttrials_enable_execution"):GetBool() then
 
-                if IsValid(target) and target:IsPlayer() and target:IsDowned() and not (target:GetBleedoutTime() <= 0) then
-                    if target:GetPos():DistToSqr(ply:GetPos()) < 10000 and not target:IsPlayingSVAnimation() then
-                        --PrintMessage(HUD_PRINTTALK, ply:Nick() .. " tried killing a: " .. target:Nick())
-                        target:SetNWEntity("Outlast_Impostor", ply)
-                        ply:SetNWEntity("Outlast_ImpostorVictim", target) 
-                        ply.ExecTarget = target
-                        ply.ExecDirection = ExecDirection
-                        ply.ExecStart = CurTime()
-                        ply.StartedExecution = false
-                        ply.Outlast_UnequipedWeapon = ply:GetActiveWeapon()
-                        hook.Run("Outlast_PlayerExecuting", ply, target)
+                if not ply.ExecTarget and ply:KeyPressed(IN_RELOAD) and not ply:IsDowned() then
+                    local tr = ply:GetEyeTraceNoCursor()
+                    local target = tr.Entity
+                    local ExecDirection = GetApproachDirection(ply, target)
+
+                    if IsValid(target) and target:IsPlayer() and target:IsDowned() and not (target:GetBleedoutTime() <= 0) then
+                        if target:GetPos():DistToSqr(ply:GetPos()) < 10000 and not target:IsPlayingSVAnimation() then
+                            --PrintMessage(HUD_PRINTTALK, ply:Nick() .. " tried killing a: " .. target:Nick())
+                            target:SetNWEntity("Outlast_Impostor", ply)
+                            ply:SetNWEntity("Outlast_ImpostorVictim", target) 
+                            ply.ExecTarget = target
+                            ply.ExecDirection = ExecDirection
+                            ply.ExecStart = CurTime()
+                            ply.StartedExecution = false
+                            ply.Outlast_UnequipedWeapon = ply:GetActiveWeapon()
+                            hook.Run("Outlast_PlayerExecuting", ply, target)
+                        end
                     end
                 end
             end

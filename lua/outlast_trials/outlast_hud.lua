@@ -253,13 +253,15 @@ if CLIENT then
                 surface.SetDrawColor(Color(255,255,255))
                 surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 100, 25, 25, 0)
 
-                draw.SimpleTextOutlined("[R]", "DermaDefault", ScrW() / 2 - 25, ScrH() / 2 + 150, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
-                surface.SetMaterial(OutlastIcons.obj_base2)
-                surface.SetDrawColor(Color(255,255,255))
-                surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 150, 50, 50, 0)
-                surface.SetMaterial(OutlastIcons.trans_skull)
-                surface.SetDrawColor(Color(255,255,255))
-                surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 150, 25, 25, 0)
+                if GetConVar("outlasttrials_enable_execution"):GetBool() and not ply:IsDowned() and not ply:IsBeingRevived() and not ply:IsReviving() then
+                    draw.SimpleTextOutlined("[R]", "DermaDefault", ScrW() / 2 - 25, ScrH() / 2 + 150, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
+                    surface.SetMaterial(OutlastIcons.obj_base2)
+                    surface.SetDrawColor(Color(255,255,255))
+                    surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 150, 50, 50, 0)
+                    surface.SetMaterial(OutlastIcons.trans_skull)
+                    surface.SetDrawColor(Color(255,255,255))
+                    surface.DrawTexturedRectRotated(ScrW() / 2 + 25, ScrH() / 2 + 150, 25, 25, 0)
+                end
             end
 
             if ply:IsReviving() then
