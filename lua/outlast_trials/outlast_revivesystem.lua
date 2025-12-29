@@ -1,4 +1,4 @@
-survivor = FindMetaTable("Player")
+survivor = FindMetaTable("Entity")
 
 CreateConVar("outlasttrials_enabled", "1", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Enable or disable the Outlast Trials Revive System.")
 CreateConVar("outlasttrials_bleedout_time", "60", {FCVAR_ARCHIVE, FCVAR_REPLICATED}, "Time in seconds before a downed player bleeds out and dies.")
@@ -66,6 +66,7 @@ end
 function survivor:IsFallingToDowned() 
     return self:GetNWBool("Outlast_IsFalling", false)
 end
+
 
 hook.Add("SetupMove", "zzzzzz_OutlastTrialsReviveSystem_DownedMoveHandler", function(ply, mv, cmd)
     if not GetConVar("outlasttrials_enabled"):GetBool() then return end
@@ -200,6 +201,9 @@ if SERVER then
         ply.ExecStart = nil
         ply.ExecDirection = nil
         ply.ExecTime = nil
+
+        ply:Freeze(false) -- To prevent player being unable to respawn or use mouse
+        timer.Remove("OutlastPlayerDownAnim_" .. ply:EntIndex()) -- To prevent downing seq when player died mid falling
 
         //Something broke? KYS! IT'S THAT SIMPLE!
     end
@@ -802,7 +806,8 @@ if SERVER then
                         ply:SetNWEntity("Outlast_RevivingTarget", target)
                         target:SetNWFloat("Outlast_ReviveStartTime", CurTime())
                         target:SetNWBool("Outlast_IsBeingRevived", true)
-                        ply.Outlast_UnequipedWeapon = ply:GetActiveWeapon()
+                        local wep = ply:GetActiveWeapon()
+                        ply.Outlast_UnequipedWeapon = IsValid(wep) and wep or nil
                         ply:SetActiveWeapon(nil)
                         ply.RevivingTarget = target
                     end
@@ -926,7 +931,8 @@ if SERVER then
                             ply.ExecDirection = ExecDirection
                             ply.ExecStart = CurTime()
                             ply.StartedExecution = false
-                            ply.Outlast_UnequipedWeapon = ply:GetActiveWeapon()
+                            local wep = ply:GetActiveWeapon()
+                            ply.Outlast_UnequipedWeapon = IsValid(wep) and wep or nil
                             hook.Run("Outlast_PlayerExecuting", ply, target)
                         end
                     end
@@ -1021,8 +1027,138 @@ if SERVER then
                     end
                 end
             end
-
         end
+
+        --[[PROTOTYPE NPC REVIVE SYSTEM]--
+        local RegistedReviverNPCs = { 
+            ["npc_citizen"] = true,
+            ["npc_combine_s"] = true,
+            ["npc_metropolice"] = true
+        }
+
+        local RegisteredDownedNPCs = { 
+            ["npc_citizen"] = true,
+            ["npc_combine_s"] = true,
+            ["npc_metropolice"] = true,
+        }
+
+        local function IsFriend(npc, target)
+            local disposition = npc:Disposition(target) or D_NU
+            if disposition == D_LI then
+                return true
+            end
+        end
+        --NPC AI for Revive
+        for _, npc in pairs(ents.GetAll()) do
+            if npc:IsNPC() and (RegistedReviverNPCs[npc:GetClass()]) then
+                local ReviveTargets = ents.FindInSphere(npc:GetPos(), 1024)
+
+                for _, target in pairs(ReviveTargets) do
+                    local NPCReviveTarget = npc.ReviveTarget
+                    if !IsValid(NPCReviveTarget) then
+                        if (target:IsPlayer() or (npc:IsNPC() and RegisteredDownedNPCs[target:GetClass()])) and target:IsDowned() and IsFriend(npc, target) then
+                            npc.ReviveTarget = target
+                            PrintMessage(HUD_PRINTTALK, "[Outlast Trials] NPC " .. tostring(npc:GetClass()) .. " has chosen a revive target: " .. tostring(target:GetClass() == "player" and target:Nick() or target:GetClass()))
+                        end
+                    else
+                        local targetPos = NPCReviveTarget:GetPos()
+                        local distToTarget = npc:GetPos():DistToSqr(targetPos)
+
+                        if not timer.Exists("NPCReviveDelay_" .. npc:EntIndex()) then
+                            timer.Create("NPCReviveDelay_" .. npc:EntIndex(), 3, 1, function()
+                                if !IsValid(npc) then return end
+                                if IsValid(NPCReviveTarget) then
+                                    npc:SetLastPosition(targetPos)
+                                    npc:SetSchedule(SCHED_FORCED_GO_RUN)
+                                    PrintMessage(HUD_PRINTTALK, "[Outlast Trials] NPC " .. tostring(npc:GetClass()) .. " is moving to revive target.")
+                                end
+                            end)
+                        end
+
+                        local NPCProgress
+                        if distToTarget <= 2500 then
+                            
+                            if not NPCReviveTarget.NPCReviveState then
+
+                                NPCReviveTarget:SetNWFloat("Outlast_ReviveStartTime", CurTime())
+                                NPCReviveTarget:SetNWEntity("Outlast_Reviver", npc)
+                                NPCReviveTarget:SetNWBool("Outlast_IsBeingRevived", true)
+
+                                npc:SetNWEntity("Outlast_RevivingTarget", NPCReviveTarget)
+
+                                NPCReviveTarget.NPCReviveState = true
+                            end
+
+                            if not npc:IsPlayingSVAnimation() and not NPCReviveTarget:IsPlayingSVAnimation() then
+                                local ApproachDirection = GetApproachDirection(npc, NPCReviveTarget)
+                                if ApproachDirection == "front" then
+                                    npc:SetSVMultiAnimation({OutlastAnims.helpup_phase1_front, OutlastAnims.helpup_phase2_front, OutlastAnims.helpup_phase3_front}, true)
+                                    NPCReviveTarget:SetSVMultiAnimation({OutlastAnims.getup_phase1_front, OutlastAnims.getup_phase2_front, OutlastAnims.getup_phase3_front}, true)
+                                elseif ApproachDirection == "back" then
+                                    npc:SetSVMultiAnimation({OutlastAnims.helpup_phase1_back, OutlastAnims.helpup_phase2_back, OutlastAnims.helpup_phase3_back},  true)
+                                    NPCReviveTarget:SetSVMultiAnimation({OutlastAnims.getup_phase1_back, OutlastAnims.getup_phase2_back, OutlastAnims.getup_phase3_back}, true)
+                                elseif ApproachDirection == "left" then
+                                    npc:SetSVMultiAnimation({OutlastAnims.helpup_phase1_left, OutlastAnims.helpup_phase2_left, OutlastAnims.helpup_phase3_left},  true)
+                                    NPCReviveTarget:SetSVMultiAnimation({OutlastAnims.getup_phase1_left, OutlastAnims.getup_phase2_left, OutlastAnims.getup_phase3_left}, true)
+                                elseif ApproachDirection == "right" then
+                                    npc:SetSVMultiAnimation({OutlastAnims.helpup_phase1_right, OutlastAnims.helpup_phase2_right, OutlastAnims.helpup_phase3_right},  true)
+                                    NPCReviveTarget:SetSVMultiAnimation({OutlastAnims.getup_phase1_right, OutlastAnims.getup_phase2_right, OutlastAnims.getup_phase3_right}, true)
+                                end
+                            end
+
+                            local function CancelNPCRevive(npc, target)
+                                if not IsValid(target) then return end
+
+                                target.NPCReviveState = nil
+                                target:SetNWBool("Outlast_IsBeingRevived", false)
+                                target:SetNWEntity("Outlast_Reviver", NULL)
+                                target:SetReviveProgress(0)
+
+                                if IsValid(npc) then
+                                    npc.ReviveTarget = nil
+                                    npc:SetNWEntity("Outlast_RevivingTarget", NULL)
+                                end
+
+                                if not IsValid(npc) then 
+                                    PrintMessage(HUD_PRINTTALK, "[Outlast Trials] NPC revive cancelled: NPC is no longer valid.")
+                                    NPCReviveTarget:SetNWFloat("Outlast_ReviveStartTime", nil)
+                                    target:SetNWBool("Outlast_IsBeingRevived", false)
+                                    target:SetNWEntity("Outlast_Reviver", NULL)
+                                    target:SetReviveProgress(0)
+                                end
+                            end
+
+
+                            if !IsValid(npc) then
+                                CancelNPCRevive(npc, NPCReviveTarget)
+                                return
+                            end
+
+                            local reviveTime = 5
+                            local startTime = NPCReviveTarget:GetNWFloat("Outlast_ReviveStartTime", 0)
+
+                            local elapsed = CurTime() - startTime
+                            local progress = math.Clamp(elapsed / reviveTime, 0, 1)
+
+                            NPCReviveTarget:SetReviveProgress(progress)
+
+                            if progress ~= nil then
+                                if progress >= 1 then
+                                    NPCReviveTarget:Revive()
+                                    NPCReviveTarget.NPCReviveState = nil
+                                    npc.ReviveTarget = nil
+                                    NPCReviveTarget:SetNWEntity("Outlast_Reviver", NULL)
+                                    NPCReviveTarget:SetNWBool("Outlast_IsBeingRevived", false)
+                                    NPCReviveTarget:SetReviveProgress(0)
+                                    hook.Run("Outlast_PlayerRevived", npc, NPCReviveTarget)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        ]]--
     end)
 
     hook.Add("ShouldCollide", "OutlastTrialsReviveSystem_CollisionHandler", function(ent1, ent2)
@@ -1079,10 +1215,16 @@ if SERVER then
 
     hook.Add("Outlast_PlayerRevived", "OutlastTrialsReviveSystem_NotifyRevived", function(reviver, revivedPlayer)
         if not IsValid(reviver) or not IsValid(revivedPlayer) then return end
+        local reviverName
+        if reviver:IsNPC() then
+            reviverName = GAMEMODE:GetDeathNoticeEntityName(reviver)
+        else
+            reviverName = reviver:Nick()
+        end
 
         net.Start("OutlastTrialsReviveSystem_Notify")
             net.WriteString(revivedPlayer:Nick())
-            net.WriteString(reviver:Nick())
+            net.WriteString(reviverName)
             net.WriteString("")
             net.WriteString("revive")
         net.Broadcast()

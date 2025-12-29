@@ -1,5 +1,5 @@
 print("[Outlast Trials] Animation Handler loaded!")
-local survivor = FindMetaTable("Player")
+local survivor = FindMetaTable("Entity")
 OutlastAnims = {
     // Idle and moving anims
     idle = "player_downed_idle_loop",
