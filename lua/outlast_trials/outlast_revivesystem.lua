@@ -871,9 +871,7 @@ if SERVER then
                 else
                     ResetOutlastReviveFlags(ply, ReviveTarget)
                     ply:ResolvePlayerOverlap(ReviveTarget, 45, false)
-                    if IsValid(ply.Outlast_UnequipedWeapon) then
-                        ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
-                    end
+                    if IsValid(ply.Outlast_UnequipedWeapon) then ply:SelectWeapon(ply.Outlast_UnequipedWeapon) end
 
                     local reviver = ply
                     local target = ReviveTarget
@@ -1005,7 +1003,7 @@ if SERVER then
                         ply.ExecStart = nil
                         ply.ExecDirection = nil
                         ply.ExecTime = nil
-                        ply:SelectWeapon(ply.Outlast_UnequipedWeapon)
+                        if IsValid(ply.Outlast_UnequipedWeapon) then ply:SelectWeapon(ply.Outlast_UnequipedWeapon) end
                         ply.Outlast_UnequipedWeapon = nil
                         if IsValid(ply) then
                             ply:SetNWEntity("Outlast_ImpostorVictim", NULL)
