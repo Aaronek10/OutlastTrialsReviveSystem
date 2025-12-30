@@ -129,7 +129,7 @@ if SERVER then
         self:SetHullDuck(Vector(-16, -16, 0), Vector(16, 16, 36))
     end
 
-    function survivor:ResetState()
+    function survivor:ResetDownedState()
         self:SetDownedState(false)
         self:SetBleedoutTime(0)
     end
@@ -186,7 +186,8 @@ if SERVER then
         ply:SetNWBool("Outlast_IsBeingRevived", false)
         ply:SetNWBool("Outlast_IsFalling", false)
         ply:SetNWEntity("Outlast_Impostor", NULL)
-        ply:SetNWEntity("Outlast_ImpostorVictim", NULL) 
+        ply:SetNWEntity("Outlast_ImpostorVictim", NULL)
+        ply:Freeze(false) -- To prevent player being unable to respawn or use mouse 
         ply:StopSVMultiAnimation()
 
         ply.RevivingTarget = nil
@@ -202,7 +203,6 @@ if SERVER then
         ply.ExecDirection = nil
         ply.ExecTime = nil
 
-        ply:Freeze(false) -- To prevent player being unable to respawn or use mouse
         timer.Remove("OutlastPlayerDownAnim_" .. ply:EntIndex()) -- To prevent downing seq when player died mid falling
 
         //Something broke? KYS! IT'S THAT SIMPLE!
@@ -786,7 +786,7 @@ if SERVER then
         if ply:IsDowned() then
             ply:SetHull(Vector(-16, -16, 0), Vector(16, 16, 72))
             ply:SetHullDuck(Vector(-16, -16, 0), Vector(16, 16, 36))
-            ply:ResetState()
+            ply:ResetDownedState()
         end
         RemoveAllOutlastFlags(ply) 
         ply.DamageOwner = nil
