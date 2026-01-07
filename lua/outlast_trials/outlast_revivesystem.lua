@@ -732,7 +732,7 @@ if SERVER then
                         timer.Create("OutlastPlayerDeathAnim_" .. ply:EntIndex(), 3, 1, function()
                             if IsValid(ply) then
                                 ply:SetPos(ply:GetPos() + Vector(0,0,5))
-                                ply:TakeDamage(ply:Health(), ply.DamageOwner or game.GetWorld(), ply)
+                                ply:TakeDamage(math.huge, ply.DamageOwner or game.GetWorld(), ply)
                                 ply:Freeze(false)
                                 ply.PlayingDeathAnim = false
                             end
