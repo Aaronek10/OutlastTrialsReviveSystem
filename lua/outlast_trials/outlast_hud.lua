@@ -166,26 +166,31 @@ if CLIENT then
                     ringcolor = Color(255, 0, 0, 255) -- Czerwony
                 end
 
-                if not otherPly:IsBeingRevived() then
-                    draw.SimpleText(otherPly:Nick(), "TargetID", screenX, screenY - 50, Color(255,255,255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-                    DrawCircularRing(screenX, screenY, 30, 5, -90, 270, Color(0, 0, 0, 200))
-                    DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + plyangle, ringcolor)
-                    DrawCircularRing(screenX, screenY, 33, 2, -90, -90 + HPAngle, Color(99, 0, 0))
-                    if plytimeLeft <= 0 then
-                        surface.SetMaterial(OutlastIcons.state_dead)
-                    elseif otherPly:IsBeingExecuted() then
-                        surface.SetMaterial(OutlastIcons.state_execution)
+                -- Hide overhead icon if local player is reviving or executing this player
+                local hideOverhead = (ply:IsReviving() and ply:GetReviveTarget() == otherPly) or (ply:IsExecuting() and ply:GetExecutionTarget() == otherPly)
+
+                if not hideOverhead then
+                    if not otherPly:IsBeingRevived() then
+                        draw.SimpleText(otherPly:Nick(), "TargetID", screenX, screenY - 50, Color(255,255,255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                        DrawCircularRing(screenX, screenY, 30, 5, -90, 270, Color(0, 0, 0, 200))
+                        DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + plyangle, ringcolor)
+                        DrawCircularRing(screenX, screenY, 33, 2, -90, -90 + HPAngle, Color(99, 0, 0))
+                        if plytimeLeft <= 0 then
+                            surface.SetMaterial(OutlastIcons.state_dead)
+                        elseif otherPly:IsBeingExecuted() then
+                            surface.SetMaterial(OutlastIcons.state_execution)
+                        else
+                            surface.SetMaterial(OutlastIcons.state_bleedout)
+                        end
+                        surface.SetDrawColor(Color(255, 255, 255, 255))
+                        surface.DrawTexturedRectRotated(screenX, screenY, 50, 50, 0)
                     else
-                        surface.SetMaterial(OutlastIcons.state_bleedout)
+                        DrawCircularRing(screenX, screenY, 30, 5, -90, 270, Color(0, 0, 0, 200))
+                        DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + otherPly.ReviveAngle, reviveColor)
+                        surface.SetMaterial(OutlastIcons.state_revive)
+                        surface.SetDrawColor(Color(255, 255, 255, 255))
+                        surface.DrawTexturedRectRotated(screenX, screenY, 50, 50, 0)
                     end
-                    surface.SetDrawColor(Color(255, 255, 255, 255))
-                    surface.DrawTexturedRectRotated(screenX, screenY, 50, 50, 0)
-                else
-                    DrawCircularRing(screenX, screenY, 30, 5, -90, 270, Color(0, 0, 0, 200))
-                    DrawCircularRing(screenX, screenY, 30, 5, -90, -90 + otherPly.ReviveAngle, reviveColor)
-                    surface.SetMaterial(OutlastIcons.state_revive)
-                    surface.SetDrawColor(Color(255, 255, 255, 255))
-                    surface.DrawTexturedRectRotated(screenX, screenY, 50, 50, 0)
                 end
 
 
@@ -243,7 +248,7 @@ if CLIENT then
             end
 
             local tr = ply:GetEyeTrace()
-            if tr.Entity == otherPly and otherPly:IsDowned() and otherPly:Alive() and tr.HitPos:DistToSqr(ply:GetPos()) < 10000 and not otherPly:IsBeingRevived() then
+            if tr.Entity == otherPly and otherPly:IsDowned() and otherPly:Alive() and tr.HitPos:DistToSqr(ply:GetPos()) < 10000 and not otherPly:IsBeingRevived() and not ply:IsExecuting() then
                 --local name = otherPly:Nick()
                 draw.SimpleTextOutlined("[E]", "DermaDefault", ScrW() / 2 - 25, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
                 surface.SetMaterial(OutlastIcons.obj_base2)
@@ -279,6 +284,16 @@ if CLIENT then
                     surface.SetDrawColor(Color(255,255,255))
                     surface.DrawTexturedRectRotated(ScrW() / 2 - 50, ScrH() / 2 + 100, 50, 50, 0)
                     draw.SimpleTextOutlined(reviveTarget:Nick(), "DermaLarge", ScrW() / 2, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
+                end
+            end
+            
+            if ply:IsExecuting() then
+                local execTarget = ply:GetExecutionTarget()
+                if execTarget == otherPly then
+                    -- Show execution icon at bottom middle during execution
+                    surface.SetMaterial(OutlastIcons.state_execution)
+                    surface.SetDrawColor(Color(255, 255, 255, 255))
+                    surface.DrawTexturedRectRotated(ScrW() / 2, ScrH() - 100, 70, 70, 0)
                 end
             end
         end
