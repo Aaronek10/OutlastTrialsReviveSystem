@@ -71,7 +71,7 @@ end
 hook.Add("SetupMove", "zzzzzz_OutlastTrialsReviveSystem_DownedMoveHandler", function(ply, mv, cmd)
     if not GetConVar("outlasttrials_enabled"):GetBool() then return end
 
-    if ply:IsReviving() or ply:IsBeingRevived() or ply:IsExecuting() or ply:IsBeingExecuted() then
+    if ply:IsReviving() or ply:IsBeingRevived() or ply:IsExecuting() or ply:IsBeingExecuted() or ply:IsFallingToDowned() then
         mv:SetMaxClientSpeed(0)
         mv:SetMaxSpeed(0)
         mv:SetForwardSpeed(0)
@@ -105,6 +105,7 @@ if SERVER then
     print("[OUTLAST TRIALS] SERVER System Loaded")
 
     util.AddNetworkString("OutlastTrialsReviveSystem_Notify")
+    util.AddNetworkString("OutlastTrials_ForcePosition")
 
     function survivor:SetDownedState(state)
         self:SetNWBool("Outlast_IsDowned", state)
@@ -149,7 +150,7 @@ if SERVER then
     function survivor:HandleDownWhenReviving(target)
         target:SetNWEntity("Outlast_Reviver", NULL)
         self:SetNWEntity("Outlast_RevivingTarget", NULL)
-        target:SetNWFloat("Outlast_ReviveStartTime", nil)
+        target:SetNWFloat("Outlast_ReviveStartTime", 0)
         target:SetNWBool("Outlast_IsBeingRevived", false)
         self.RevivingTarget = nil
         target.IsFallingToDowned = nil 
@@ -165,7 +166,7 @@ if SERVER then
         reviver:SetNWEntity("Outlast_RevivingTarget", NULL)
 
         //Resetting time and bool
-        downed:SetNWFloat("Outlast_ReviveStartTime", nil)
+        downed:SetNWFloat("Outlast_ReviveStartTime", 0)
         downed:SetNWBool("Outlast_IsBeingRevived", false)
 
         //Stopping animations
@@ -182,7 +183,7 @@ if SERVER then
     local function RemoveAllOutlastFlags(ply) 
         ply:SetNWEntity("Outlast_Reviver", NULL)
         ply:SetNWEntity("Outlast_RevivingTarget", NULL)
-        ply:SetNWFloat("Outlast_ReviveStartTime", nil)
+        ply:SetNWFloat("Outlast_ReviveStartTime", 0)
         ply:SetNWBool("Outlast_IsBeingRevived", false)
         ply:SetNWBool("Outlast_IsFalling", false)
         ply:SetNWEntity("Outlast_Impostor", NULL)
@@ -243,6 +244,22 @@ if SERVER then
 
         attacker:Freeze(false)
         victim:Freeze(false)
+        
+        -- Restore movement types
+        attacker:SetMoveType(MOVETYPE_WALK)
+        victim:SetMoveType(MOVETYPE_WALK)
+        
+        -- Restore collision groups
+        attacker:SetCollisionGroup(attacker.ExecOldCollisionGroup or COLLISION_GROUP_PLAYER)
+        victim:SetCollisionGroup(victim.ExecOldCollisionGroup or COLLISION_GROUP_PLAYER)
+        
+        -- Clear locked positions
+        attacker.ExecLockedPos = nil
+        attacker.ExecLockedAng = nil
+        attacker.ExecOldCollisionGroup = nil
+        victim.ExecLockedPos = nil
+        victim.ExecLockedAng = nil
+        victim.ExecOldCollisionGroup = nil
 
         -- Odepchnięcie ATTACKERA
         local pushDir = (attacker:GetPos() - interrupter:GetPos())
@@ -374,7 +391,6 @@ if SERVER then
                 if IsValid(self) then
                     self:SetAngles(newAng)
                     self:SetEyeAngles(newAng)
-                    print("[Snapping Timer] Rotated player during snapping | Previous Ang: " .. tostring(self:GetAngles()) .. " New Ang: " .. tostring(newAng))
                 end
             end)
         end
@@ -509,9 +525,7 @@ if SERVER then
             ang:Up()      * deltaPos.z
 
         local perStep     = worldDelta / steps
-        local perStepAng  = deltaAng  / steps
         local stepTime    = duration / steps
-        local moveDir = perStep:GetNormalized()
 
         local timerID = "OutlastRM_" .. ent:EntIndex()
 
@@ -540,7 +554,6 @@ if SERVER then
             end
 
             ent:SetPos(tr.HitPos)
-            ent:SetAngles(ent:GetAngles() + perStepAng)
         end)
     end
 
@@ -568,16 +581,13 @@ if SERVER then
         local animPrefix
 
         if angle >= -45 and angle <= 45 then
-            animPrefix = "fallbackward"  -- przód
-            ply:SetNWAngle("Outlast_AfterFallAngle", (modelAng + Angle(0,180,0)), modelAng)
+            animPrefix = "fallbackward"
         elseif angle > 45 and angle < 135 then
-            animPrefix = "fallleft"    -- prawo
-            ply:SetNWAngle("Outlast_AfterFallAngle", (modelAng + Angle(0,-90,0)), modelAng)
+            animPrefix = "fallleft"
         elseif angle < -45 and angle > -135 then
-            animPrefix = "fallright"     -- lewo
-            ply:SetNWAngle("Outlast_AfterFallAngle", (modelAng + Angle(0,90,0)), modelAng)
+            animPrefix = "fallright"
         else
-            animPrefix = "fallforward" -- tył
+            animPrefix = "fallforward"
         end
 
         -- tylko centralne starty
@@ -605,28 +615,8 @@ if SERVER then
 
         ply:Freeze(true)
 
-        timer.Create("OutlastPlayerFallAnimEnd_" .. ply:EntIndex(), startTime, 1, function()
-            if not IsValid(ply) then return end
-
-            ply:Freeze(false)
-            local finalAng = ply:GetNWAngle("Outlast_AfterFallAngle", ply:GetAngles())
-            finalAng.p = 0
-            finalAng.r = 0
-
-            ply:SetAngles(finalAng)
-            ply:SetEyeAngles(finalAng)
-            ply:Freeze(true)
-
-            --PrintMessage(HUD_PRINTTALK, "[Outlast Trials] Rotated player after fall animation | New Ang: " .. tostring(finalAng))
-        end)
-
-        timer.Create("OutlastPlayerFallAnimTotalEnd_" .. ply:EntIndex(), totalTime, 1, function()
-            if not IsValid(ply) then return end
-            ply:Freeze(false)
-        end)
-
-
-        return totalTime - 1.725
+        -- Set downed state 0.3 seconds before animation ends so idle is ready to take over
+        return totalTime - 0.3
     end
 
     local function PlayReviveInterrupt(ply, target, direction, progress)
@@ -691,7 +681,7 @@ if SERVER then
                 ply:Down()
                 ply.Outlast_IsFallingToDowned = nil
                 ply:SetNWBool("Outlast_IsFalling", false)
-                ply:SetEyeAngles(ply:GetNWAngle("Outlast_AfterFallAngle", Angle(0,0,0)))
+                -- Don't force eye angles - the animation already positioned the player correctly
                 hook.Run("Outlast_PlayerDowned", ply, attacker, inflictor)
             end)
 
@@ -732,7 +722,7 @@ if SERVER then
                         timer.Create("OutlastPlayerDeathAnim_" .. ply:EntIndex(), 3, 1, function()
                             if IsValid(ply) then
                                 ply:SetPos(ply:GetPos() + Vector(0,0,5))
-                                ply:TakeDamage(math.huge, ply.DamageOwner or game.GetWorld(), ply)
+                                ply:TakeDamage(ply:Health(), ply.DamageOwner or game.GetWorld(), ply)
                                 ply:Freeze(false)
                                 ply.PlayingDeathAnim = false
                             end
@@ -792,15 +782,65 @@ if SERVER then
         ply.DamageOwner = nil
     end)
 
+    -- Clean up execution/revive states when a player disconnects
+    hook.Add("PlayerDisconnected", "OutlastTrialsReviveSystem_DisconnectHandler", function(ply)
+        if not GetConVar("outlasttrials_enabled"):GetBool() then return end
+        
+        -- If disconnecting player was executing someone, free the victim
+        local victim = ply:GetExecutionTarget()
+        if IsValid(victim) then
+            victim:SetNWEntity("Outlast_Impostor", NULL)
+            victim:Freeze(false)
+            victim:SetMoveType(MOVETYPE_WALK)
+            victim:SetCollisionGroup(victim.ExecOldCollisionGroup or COLLISION_GROUP_PLAYER)
+            victim.ExecLockedPos = nil
+            victim.ExecLockedAng = nil
+            victim.ExecOldCollisionGroup = nil
+            victim:StopSVMultiAnimation()
+        end
+        
+        -- If disconnecting player was being executed, free the attacker
+        local attacker = ply:GetExecutionKiller()
+        if IsValid(attacker) then
+            attacker:SetNWEntity("Outlast_ImpostorVictim", NULL)
+            attacker:Freeze(false)
+            attacker:SetMoveType(MOVETYPE_WALK)
+            attacker:SetCollisionGroup(attacker.ExecOldCollisionGroup or COLLISION_GROUP_PLAYER)
+            attacker.StartedExecution = false
+            attacker.ExecTarget = nil
+            attacker.ExecStart = nil
+            attacker.ExecDirection = nil
+            attacker.ExecTime = nil
+            attacker.ExecLockedPos = nil
+            attacker.ExecLockedAng = nil
+            attacker.ExecOldCollisionGroup = nil
+            attacker:StopSVMultiAnimation()
+        end
+        
+        -- If disconnecting player was reviving someone, cancel the revive
+        local reviveTarget = ply:GetReviveTarget()
+        if IsValid(reviveTarget) then
+            ResetOutlastReviveFlags(ply, reviveTarget)
+        end
+        
+        -- If disconnecting player was being revived, cancel the revive
+        local reviver = ply:GetNWEntity("Outlast_Reviver", NULL)
+        if IsValid(reviver) then
+            ResetOutlastReviveFlags(reviver, ply)
+        end
+        
+        RemoveAllOutlastFlags(ply)
+    end)
+
     hook.Add("Think", "OutlastTrialsReviveSystem_DownedThinkHandler", function()
         if not GetConVar("outlasttrials_enabled"):GetBool() then return end
         for _, ply in pairs(player.GetAll()) do
-            if not IsValid(ply) or not ply:Alive() then return end
+            if not IsValid(ply) or not ply:Alive() then continue end
 
             //Reviving Section
             local target = ply:GetEyeTrace().Entity
-            if not ply.RevivingTarget and ply:KeyDown(IN_USE) and not ply:IsDowned() and not ply.KickedAttacker then
-                if IsValid(target) and target:IsPlayer() and target:IsDowned() and not (target:GetBleedoutTime() <= 0 or target:IsBeingExecuted()) then
+            if not ply.RevivingTarget and ply:KeyDown(IN_USE) and not ply:IsDowned() and not ply:IsFallingToDowned() and not ply.KickedAttacker and not ply:IsExecuting() and not ply:IsBeingExecuted() then
+                if IsValid(target) and target:IsPlayer() and target:IsDowned() and not target:IsFallingToDowned() and not (target:GetBleedoutTime() <= 0 or target:IsBeingExecuted()) then
                     if ply:GetPos():DistToSqr(target:GetPos()) < 10000 then 
                         target:SetNWEntity("Outlast_Reviver", ply)
                         ply:SetNWEntity("Outlast_RevivingTarget", target)
@@ -816,7 +856,16 @@ if SERVER then
 
             local ReviveTarget = ply.RevivingTarget
             if ReviveTarget and IsValid(ReviveTarget) and ReviveTarget:IsDowned() then
-                if ply:KeyDown(IN_USE) then
+                -- Cancel revive if target is being executed
+                if ReviveTarget:IsBeingExecuted() then
+                    local direction = GetApproachDirection(ply, ReviveTarget)
+                    local reviveTime = 5
+                    local elapsed = CurTime() - ReviveTarget:GetNWFloat("Outlast_ReviveStartTime", CurTime())
+                    local progress = math.Clamp(elapsed / reviveTime, 0, 1)
+                    PlayReviveInterrupt(ply, ReviveTarget, direction, progress)
+                    ResetOutlastReviveFlags(ply, ReviveTarget)
+                    if IsValid(ply.Outlast_UnequipedWeapon) then ply:SelectWeapon(ply.Outlast_UnequipedWeapon) end
+                elseif ply:KeyDown(IN_USE) then
                     local reviveTime = 5
                     local elapsed = CurTime() - ReviveTarget:GetNWFloat("Outlast_ReviveStartTime", CurTime())
                     local progress = math.Clamp(elapsed / reviveTime, 0, 1)
@@ -890,14 +939,15 @@ if SERVER then
                 end
             end
 
-            if ply:IsDowned() then
+            if ply:IsDowned() or ply:IsFallingToDowned() then
                 ply:SetActiveWeapon(nil)
             end
 
             // Freeze player when being revived or falling to downed state
-            if ply:IsBeingRevived() or ply:IsFallingToDowned() or ply:IsBeingExecuted() or ply:IsExecuting() then
+            // Don't override freeze state if player is falling (HandleFallAnimation manages that)
+            if ply:IsBeingRevived() or ply:IsBeingExecuted() or ply:IsExecuting() then
                 ply:Freeze(true)
-            else
+            elseif not ply:IsFallingToDowned() and not ply.PlayingDeathAnim then
                 ply:Freeze(false)
             end
 
@@ -915,14 +965,16 @@ if SERVER then
             //Executions Section
             if GetConVar("outlasttrials_enable_execution"):GetBool() then
 
-                if not ply.ExecTarget and ply:KeyPressed(IN_RELOAD) and not ply:IsDowned() then
+                if not ply.ExecTarget and not ply:IsReviving() and not ply:IsExecuting() and not ply:IsBeingRevived() and ply:KeyPressed(IN_RELOAD) and not ply:IsDowned() and not ply:IsFallingToDowned() then
                     local tr = ply:GetEyeTraceNoCursor()
                     local target = tr.Entity
+                    
+                    if not IsValid(target) or not target:IsPlayer() then continue end
+                    
                     local ExecDirection = GetApproachDirection(ply, target)
 
-                    if IsValid(target) and target:IsPlayer() and target:IsDowned() and not (target:GetBleedoutTime() <= 0) then
-                        if target:GetPos():DistToSqr(ply:GetPos()) < 10000 and not target:IsPlayingSVAnimation() then
-                            --PrintMessage(HUD_PRINTTALK, ply:Nick() .. " tried killing a: " .. target:Nick())
+                    if target:IsDowned() and not target:IsFallingToDowned() and not (target:GetBleedoutTime() <= 0) then
+                        if target:GetPos():DistToSqr(ply:GetPos()) < 10000 and not target:IsPlayingSVAnimation() and not target:IsBeingRevived() and not target:IsBeingExecuted() then
                             target:SetNWEntity("Outlast_Impostor", ply)
                             ply:SetNWEntity("Outlast_ImpostorVictim", target) 
                             ply.ExecTarget = target
@@ -939,7 +991,24 @@ if SERVER then
 
             local ExecTarget = ply.ExecTarget
             if ExecTarget and IsValid(ExecTarget) then
-                if not ply.StartedExecution then
+                -- Cancel execution if target is no longer valid or died
+                if not ExecTarget:Alive() or not ExecTarget:IsDowned() then
+                    ply:Freeze(false)
+                    ply:SetMoveType(MOVETYPE_WALK)
+                    ply:SetCollisionGroup(ply.ExecOldCollisionGroup or COLLISION_GROUP_PLAYER)
+                    ply:StopSVMultiAnimation()
+                    ply.StartedExecution = false
+                    ply.ExecTarget = nil
+                    ply.ExecStart = nil
+                    ply.ExecDirection = nil
+                    ply.ExecTime = nil
+                    ply.ExecLockedPos = nil
+                    ply.ExecLockedAng = nil
+                    ply.ExecOldCollisionGroup = nil
+                    ply:SetNWEntity("Outlast_ImpostorVictim", NULL)
+                    if IsValid(ply.Outlast_UnequipedWeapon) then ply:SelectWeapon(ply.Outlast_UnequipedWeapon) end
+                    ply.Outlast_UnequipedWeapon = nil
+                elseif not ply.StartedExecution then
                     local dir = ply.ExecDirection
                     local seq
                     local killerseq
@@ -958,38 +1027,113 @@ if SERVER then
                     end
 
                     ply.ExecSeq, ply.ExecTime = ply:LookupSequence(killerseq)
-                    ExecTarget:SetSVAnimation(seq, true)
-                    ply:SetSVAnimation(killerseq, true)
+                    
+                    // Disable collision first
+                    ply.ExecOldCollisionGroup = ply:GetCollisionGroup()
+                    ExecTarget.ExecOldCollisionGroup = ExecTarget:GetCollisionGroup()
+                    ply:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+                    ExecTarget:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+                    
+                    // Calculate proper positions based on direction
+                    local victimPos = ExecTarget:GetPos()
+                    local victimAng = ExecTarget:GetAngles()
+                    victimAng.p = 0
+                    victimAng.r = 0
+                    
+                    // Calculate attacker angle - should face toward victim based on direction
+                    local attackerAng = Angle(0, 0, 0)
+                    if dir == "front" then
+                        attackerAng = Angle(0, victimAng.y + 180, 0)
+                    elseif dir == "back" then
+                        attackerAng = Angle(0, victimAng.y, 0)
+                    elseif dir == "left" then
+                        attackerAng = Angle(0, victimAng.y - 90, 0)
+                    elseif dir == "right" then
+                        attackerAng = Angle(0, victimAng.y + 90, 0)
+                    end
+                    attackerAng:Normalize()
+                    
+                    // Lock positions - both at victim's position, animations handle visual offset
+                    ply.ExecLockedPos = victimPos
+                    ply.ExecLockedAng = attackerAng
+                    ExecTarget.ExecLockedPos = victimPos
+                    ExecTarget.ExecLockedAng = victimAng
+                    
+                    // Apply positions and freeze before starting animations
+                    ply:SetPos(victimPos)
+                    ExecTarget:SetPos(victimPos)
+                    ply:SetAngles(attackerAng)
+                    ply:SetEyeAngles(attackerAng)
+                    ExecTarget:SetAngles(victimAng)
+                    ExecTarget:SetEyeAngles(victimAng)
                     ply:Freeze(true)
                     ExecTarget:Freeze(true)
+                    
+                    // Disable movement
+                    ply:SetMoveType(MOVETYPE_NONE)
+                    ExecTarget:SetMoveType(MOVETYPE_NONE)
+                    ply:SetLocalVelocity(Vector(0,0,0))
+                    ExecTarget:SetLocalVelocity(Vector(0,0,0))
+                    
+                    // Force client to update position before animation starts
+                    net.Start("OutlastTrials_ForcePosition")
+                        net.WriteVector(victimPos)
+                        net.WriteAngle(attackerAng)
+                    net.Send(ply)
+                    
+                    net.Start("OutlastTrials_ForcePosition")
+                        net.WriteVector(victimPos)
+                        net.WriteAngle(victimAng)
+                    net.Send(ExecTarget)
+                    
+                    // Now start animations after positioning is applied
+                    // Use the same start time for both to ensure sync
+                    local animStartTime = CurTime()
+                    
+                    ExecTarget:SetNWString("SVAnim", seq)
+                    ExecTarget:SetNWFloat("SVAnimDelay", ply.ExecTime)
+                    ExecTarget:SetNWFloat("SVAnimStartTime", animStartTime)
+                    ExecTarget:SetCycle(0)
+                    
+                    ply:SetNWString("SVAnim", killerseq)
+                    ply:SetNWFloat("SVAnimDelay", ply.ExecTime)
+                    ply:SetNWFloat("SVAnimStartTime", animStartTime)
+                    ply:SetCycle(0)
+                    
                     ply:SetActiveWeapon(nil)
                     ply.StartedExecution = true
-
-                    //Set attacker pos and angle to be the same as victim
-                    ply:SetPos(ExecTarget:GetPos())
-                    ply:SetAngles(ExecTarget:GetAngles())
-                else
-                    //Snapping
-                    --[[
-                    if CurTime() - ply.ExecStart <= 2.5 then
-                        local ExecDirection = GetApproachDirection(ply, ExecTarget)
-                        local VictimAngle = (ExecTarget:GetPos() - ply:GetPos()):Angle()
-                        VictimAngle.p = 0
-                        ply:SetEyeAngles(VictimAngle)
-                        ply:SetAngles(VictimAngle)
-
-                        if ExecDirection == "front" then
-                            ply:SnapToDownedPosition(ExecTarget, "front", 40)
-                        elseif ExecDirection == "back" then
-                            ply:SnapToDownedPosition(ExecTarget, "back", 65, -0)
-                        elseif ExecDirection == "left" then
-                            ply:SnapToDownedPosition(ExecTarget, "left", 35, -5)
-                        elseif ExecDirection == "right" then
-                            ply:SnapToDownedPosition(ExecTarget, "right", 40)
+                    
+                    -- Auto-stop timers
+                    timer.Simple(ply.ExecTime, function()
+                        if IsValid(ExecTarget) and ExecTarget:GetNWString("SVAnim") == seq then
+                            ExecTarget:SetNWString("SVAnim", "")
                         end
-
+                    end)
+                    timer.Simple(ply.ExecTime, function()
+                        if IsValid(ply) and ply:GetNWString("SVAnim") == killerseq then
+                            ply:SetNWString("SVAnim", "")
+                        end
+                    end)
+                else
+                    // Keep both players locked to their positions throughout execution
+                    if ply.ExecLockedPos and IsValid(ExecTarget) and ExecTarget.ExecLockedPos then
+                        -- Force position every frame (both at same position)
+                        ply:SetPos(ply.ExecLockedPos)
+                        ExecTarget:SetPos(ExecTarget.ExecLockedPos)
+                        
+                        -- Force angles every frame (attacker faces victim based on direction)
+                        if ply.ExecLockedAng then
+                            ply:SetAngles(ply.ExecLockedAng)
+                            ply:SetEyeAngles(ply.ExecLockedAng)
+                        end
+                        if ExecTarget.ExecLockedAng then
+                            ExecTarget:SetAngles(ExecTarget.ExecLockedAng)
+                        end
+                        
+                        -- Kill any velocity
+                        ply:SetLocalVelocity(Vector(0,0,0))
+                        ExecTarget:SetLocalVelocity(Vector(0,0,0))
                     end
-                    ]]--
 
                     if CurTime() - ply.ExecStart >= (ply.ExecTime or 0) then
                         if IsValid(ExecTarget) and ExecTarget:Alive() and ExecTarget:IsDowned() then
@@ -997,12 +1141,24 @@ if SERVER then
                         end
                         
                         ply:Freeze(false)
-                        if IsValid(ExecTarget) then ExecTarget:Freeze(false) end
+                        ply:SetMoveType(MOVETYPE_WALK)
+                        ply:SetCollisionGroup(ply.ExecOldCollisionGroup or COLLISION_GROUP_PLAYER)
+                        if IsValid(ExecTarget) then 
+                            ExecTarget:Freeze(false) 
+                            ExecTarget:SetMoveType(MOVETYPE_WALK)
+                            ExecTarget:SetCollisionGroup(ExecTarget.ExecOldCollisionGroup or COLLISION_GROUP_PLAYER)
+                            ExecTarget.ExecLockedPos = nil
+                            ExecTarget.ExecLockedAng = nil
+                            ExecTarget.ExecOldCollisionGroup = nil
+                        end
                         ply.StartedExecution = false
                         ply.ExecTarget = nil
                         ply.ExecStart = nil
                         ply.ExecDirection = nil
                         ply.ExecTime = nil
+                        ply.ExecLockedPos = nil
+                        ply.ExecLockedAng = nil
+                        ply.ExecOldCollisionGroup = nil
                         if IsValid(ply.Outlast_UnequipedWeapon) then ply:SelectWeapon(ply.Outlast_UnequipedWeapon) end
                         ply.Outlast_UnequipedWeapon = nil
                         if IsValid(ply) then
@@ -1016,7 +1172,7 @@ if SERVER then
             end
 
             -- === EXECUTION INTERRUPT ===
-            if ply:KeyPressed(IN_USE) and not ply:IsDowned() then
+            if ply:KeyPressed(IN_USE) and not ply:IsDowned() and not ply:IsFallingToDowned() then
                 local attacker, victim = GetExecutionFromView(ply)
 
                 if IsValid(attacker) and IsValid(victim) then
@@ -1167,7 +1323,12 @@ if SERVER then
         local ply1 = ent1
         local ply2 = ent2
 
-        if (ply1:IsBeingRevived() or ply1:IsReviving() or ply1:IsExecuting() or ply1:IsBeingExecuted()) and (ply2:IsBeingRevived() or ply2:IsReviving() or ply2:IsExecuting() or ply2:IsBeingExecuted()) then
+        -- Check if either player is in any animation state
+        local ply1InState = ply1:IsBeingRevived() or ply1:IsReviving() or ply1:IsExecuting() or ply1:IsBeingExecuted() or ply1:IsDowned() or ply1:IsFallingToDowned()
+        local ply2InState = ply2:IsBeingRevived() or ply2:IsReviving() or ply2:IsExecuting() or ply2:IsBeingExecuted() or ply2:IsDowned() or ply2:IsFallingToDowned()
+
+        -- Disable collision if either player is in an animation state
+        if ply1InState or ply2InState then
             return false
         end
     end)
@@ -1243,6 +1404,20 @@ end
 
 if CLIENT then
     print("[OTRS] CLIENT System Loaded")
+    
+    // Receive forced position from server during executions
+    net.Receive("OutlastTrials_ForcePosition", function()
+        local pos = net.ReadVector()
+        local ang = net.ReadAngle()
+        local ply = LocalPlayer()
+        
+        if IsValid(ply) then
+            ply:SetPos(pos)
+            ply:SetAngles(ang)
+            ply:SetEyeAngles(ang)
+            ply:SetLocalVelocity(Vector(0,0,0))
+        end
+    end)
 
     concommand.Add("outlast_trials_printstatus", function()
         local ply = LocalPlayer()

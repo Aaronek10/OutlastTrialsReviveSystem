@@ -355,48 +355,52 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
 
     local ReviveProgress = viewply:GetReviveProgress()
 
+    -- Use hash table for O(1) lookup instead of table.HasValue O(n)
     local fixedcamtable = {
         -- Get-up animations
-        OutlastAnims.getup_phase1_back, OutlastAnims.getup_phase2_back, OutlastAnims.getup_phase3_back,
-        OutlastAnims.getup_phase1_front, OutlastAnims.getup_phase2_front, OutlastAnims.getup_phase3_front,
-        OutlastAnims.getup_phase1_left, OutlastAnims.getup_phase2_left, OutlastAnims.getup_phase3_left,
-        OutlastAnims.getup_phase1_right, OutlastAnims.getup_phase2_right, OutlastAnims.getup_phase3_right,
+        [OutlastAnims.getup_phase1_back] = true, [OutlastAnims.getup_phase2_back] = true, [OutlastAnims.getup_phase3_back] = true,
+        [OutlastAnims.getup_phase1_front] = true, [OutlastAnims.getup_phase2_front] = true, [OutlastAnims.getup_phase3_front] = true,
+        [OutlastAnims.getup_phase1_left] = true, [OutlastAnims.getup_phase2_left] = true, [OutlastAnims.getup_phase3_left] = true,
+        [OutlastAnims.getup_phase1_right] = true, [OutlastAnims.getup_phase2_right] = true, [OutlastAnims.getup_phase3_right] = true,
 
         -- Help-up animations
-        OutlastAnims.helpup_phase1_back, OutlastAnims.helpup_phase2_back, OutlastAnims.helpup_phase3_back,
-        OutlastAnims.helpup_phase1_front, OutlastAnims.helpup_phase2_front, OutlastAnims.helpup_phase3_front,
-        OutlastAnims.helpup_phase1_left, OutlastAnims.helpup_phase2_left, OutlastAnims.helpup_phase3_left,
-        OutlastAnims.helpup_phase1_right, OutlastAnims.helpup_phase2_right, OutlastAnims.helpup_phase3_right,
+        [OutlastAnims.helpup_phase1_back] = true, [OutlastAnims.helpup_phase2_back] = true, [OutlastAnims.helpup_phase3_back] = true,
+        [OutlastAnims.helpup_phase1_front] = true, [OutlastAnims.helpup_phase2_front] = true, [OutlastAnims.helpup_phase3_front] = true,
+        [OutlastAnims.helpup_phase1_left] = true, [OutlastAnims.helpup_phase2_left] = true, [OutlastAnims.helpup_phase3_left] = true,
+        [OutlastAnims.helpup_phase1_right] = true, [OutlastAnims.helpup_phase2_right] = true, [OutlastAnims.helpup_phase3_right] = true,
 
         -- Fall backward
-        OutlastAnims.fallbackward_start_center_rootmotion, OutlastAnims.fallbackward_start_left_rootmotion, OutlastAnims.fallbackward_start_right_rootmotion,
-        OutlastAnims.fallbackward_end,
+        [OutlastAnims.fallbackward_start_center_rootmotion] = true, [OutlastAnims.fallbackward_start_left_rootmotion] = true, [OutlastAnims.fallbackward_start_right_rootmotion] = true,
+        [OutlastAnims.fallbackward_end] = true, [OutlastAnims.fallbackward_end_notrot] = true,
 
         -- Fall forward
-        OutlastAnims.fallforward_start_center_rootmotion, OutlastAnims.fallforward_start_left_rootmotion, OutlastAnims.fallforward_start_right_rootmotion,
-        OutlastAnims.fallforward_end,
+        [OutlastAnims.fallforward_start_center_rootmotion] = true, [OutlastAnims.fallforward_start_left_rootmotion] = true, [OutlastAnims.fallforward_start_right_rootmotion] = true,
+        [OutlastAnims.fallforward_end] = true,
 
         -- Fall left
-        OutlastAnims.fallleft_start_center_rootmotion, OutlastAnims.fallleft_start_left_rootmotion, OutlastAnims.fallleft_start_right_rootmotion,
-        OutlastAnims.fallleft_end,
+        [OutlastAnims.fallleft_start_center_rootmotion] = true, [OutlastAnims.fallleft_start_left_rootmotion] = true, [OutlastAnims.fallleft_start_right_rootmotion] = true,
+        [OutlastAnims.fallleft_end] = true, [OutlastAnims.fallleft_end_notrot] = true,
 
         -- Fall right
-        OutlastAnims.fallright_start_center_rootmotion, OutlastAnims.fallright_start_left_rootmotion, OutlastAnims.fallright_start_right_rootmotion,
-        OutlastAnims.fallright_end,
+        [OutlastAnims.fallright_start_center_rootmotion] = true, [OutlastAnims.fallright_start_left_rootmotion] = true, [OutlastAnims.fallright_start_right_rootmotion] = true,
+        [OutlastAnims.fallright_end] = true, [OutlastAnims.fallright_end_notrot] = true,
 
-        -- Deaths and finishers
-        OutlastAnims.downeddeath,
-        OutlastAnims.finisher_front, OutlastAnims.finisher_back, OutlastAnims.finisher_left, OutlastAnims.finisher_right,
-        OutlastAnims.victim_front, OutlastAnims.victim_back, OutlastAnims.victim_left, OutlastAnims.victim_right
+        -- Death and finishers
+        [OutlastAnims.downeddeath] = true,
+        [OutlastAnims.finisher_front] = true, [OutlastAnims.finisher_back] = true, [OutlastAnims.finisher_left] = true, [OutlastAnims.finisher_right] = true,
+        [OutlastAnims.victim_front] = true, [OutlastAnims.victim_back] = true, [OutlastAnims.victim_left] = true, [OutlastAnims.victim_right] = true
     }
 
 
     local PlyOrigin, PlyAng
+    local currentAnim = viewply:GetNWString("SVAnim", "")
 
-    if table.HasValue(fixedcamtable, viewply:GetNWString("SVAnim", "")) then
+    -- Use attachment camera for animations in the fixedcamtable
+    local useAttachmentCam = fixedcamtable[currentAnim]
+
+    if useAttachmentCam then
         PlyAng = attLoc.Ang
         PlyOrigin = attLoc.Pos
-        --chat.AddText("Fixed Cam Applied for animation: " .. viewply:GetNWString("SVAnim", ""))
         if ReviveProgress > 0.8 and isDowned then
             local t = math.Clamp((ReviveProgress - 0.8) / 0.2, 0, 1)
             local targetPos = viewply:EyePos()
@@ -418,14 +422,22 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
         "ValveBiped.Bip01_R_Clavicle",
     }
 
+    local shouldHideBones = (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted or isFalling)
+    
     for _, boneName in ipairs(hiddenBones) do
         local boneId = viewply:LookupBone(boneName)
         if boneId then
-            if (isDowned or isReviving or isBeingRevived or isExecuting or isBeingExecuted or isFalling) then
+            if shouldHideBones then
                 viewply:ManipulateBoneScale(boneId, Vector(0, 0, 0))
-                timer.Create("LocalPly_returnbonescales_Bone" .. boneId .. "_" .. viewply:Nick(), 1, 1, function()
-                    viewply:ManipulateBoneScale(boneId, Vector(1, 1, 1))
-                end)
+                -- Only create timer if not already pending
+                local timerName = "LocalPly_returnbonescales_Bone" .. boneId .. "_" .. viewply:EntIndex()
+                if not timer.Exists(timerName) then
+                    timer.Create(timerName, 1, 1, function()
+                        if IsValid(viewply) then
+                            viewply:ManipulateBoneScale(boneId, Vector(1, 1, 1))
+                        end
+                    end)
+                end
             end
         end
     end
@@ -471,3 +483,25 @@ if CLIENT then
     end)
 end
 
+
+-- Shared hook to prevent movement during executions
+hook.Add("Move", "OutlastTrials_BlockExecutionMovement", function(ply, mv)
+    if ply:IsExecuting() or ply:IsBeingExecuted() then
+        mv:SetVelocity(Vector(0, 0, 0))
+        mv:SetMaxSpeed(0)
+        mv:SetMaxClientSpeed(0)
+        return true -- Block default movement
+    end
+end)
+
+-- Prevent any position changes from client prediction during executions
+if SERVER then
+    hook.Add("FinishMove", "OutlastTrials_LockExecutionPosition", function(ply, mv)
+        if ply:IsExecuting() or ply:IsBeingExecuted() then
+            if ply.ExecLockedPos then
+                ply:SetPos(ply.ExecLockedPos)
+                ply:SetLocalVelocity(Vector(0,0,0))
+            end
+        end
+    end)
+end
