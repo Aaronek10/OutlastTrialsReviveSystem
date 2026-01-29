@@ -248,7 +248,7 @@ if CLIENT then
             end
 
             local tr = ply:GetEyeTrace()
-            if tr.Entity == otherPly and otherPly:IsDowned() and otherPly:Alive() and tr.HitPos:DistToSqr(ply:GetPos()) < 10000 and not otherPly:IsBeingRevived() and not ply:IsExecuting() then
+            if tr.Entity == otherPly and otherPly:IsDowned() and otherPly:Alive() and ply:GetPos():DistToSqr(otherPly:GetPos()) < 10000 and not otherPly:IsBeingRevived() and not ply:IsExecuting() then
                 --local name = otherPly:Nick()
                 draw.SimpleTextOutlined("[E]", "DermaDefault", ScrW() / 2 - 25, ScrH() / 2 + 100, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 2, Color(0, 0, 0))
                 surface.SetMaterial(OutlastIcons.obj_base2)

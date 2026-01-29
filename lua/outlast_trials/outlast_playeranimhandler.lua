@@ -371,7 +371,7 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
 
         -- Fall backward
         [OutlastAnims.fallbackward_start_center_rootmotion] = true, [OutlastAnims.fallbackward_start_left_rootmotion] = true, [OutlastAnims.fallbackward_start_right_rootmotion] = true,
-        [OutlastAnims.fallbackward_end] = true,
+        [OutlastAnims.fallbackward_end] = true, [OutlastAnims.fallbackward_end_notrot] = true,
 
         -- Fall forward
         [OutlastAnims.fallforward_start_center_rootmotion] = true, [OutlastAnims.fallforward_start_left_rootmotion] = true, [OutlastAnims.fallforward_start_right_rootmotion] = true,
@@ -379,13 +379,13 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
 
         -- Fall left
         [OutlastAnims.fallleft_start_center_rootmotion] = true, [OutlastAnims.fallleft_start_left_rootmotion] = true, [OutlastAnims.fallleft_start_right_rootmotion] = true,
-        [OutlastAnims.fallleft_end] = true,
+        [OutlastAnims.fallleft_end] = true, [OutlastAnims.fallleft_end_notrot] = true,
 
         -- Fall right
         [OutlastAnims.fallright_start_center_rootmotion] = true, [OutlastAnims.fallright_start_left_rootmotion] = true, [OutlastAnims.fallright_start_right_rootmotion] = true,
-        [OutlastAnims.fallright_end] = true,
+        [OutlastAnims.fallright_end] = true, [OutlastAnims.fallright_end_notrot] = true,
 
-        -- Deaths and finishers
+        -- Death and finishers
         [OutlastAnims.downeddeath] = true,
         [OutlastAnims.finisher_front] = true, [OutlastAnims.finisher_back] = true, [OutlastAnims.finisher_left] = true, [OutlastAnims.finisher_right] = true,
         [OutlastAnims.victim_front] = true, [OutlastAnims.victim_back] = true, [OutlastAnims.victim_left] = true, [OutlastAnims.victim_right] = true
@@ -395,10 +395,12 @@ hook.Add("CalcView", "OutlastTrialsDownedViewOffset", function(ply, pos, ang, fo
     local PlyOrigin, PlyAng
     local currentAnim = viewply:GetNWString("SVAnim", "")
 
-    if fixedcamtable[currentAnim] then
+    -- Use attachment camera for animations in the fixedcamtable
+    local useAttachmentCam = fixedcamtable[currentAnim]
+
+    if useAttachmentCam then
         PlyAng = attLoc.Ang
         PlyOrigin = attLoc.Pos
-        --chat.AddText("Fixed Cam Applied for animation: " .. currentAnim)
         if ReviveProgress > 0.8 and isDowned then
             local t = math.Clamp((ReviveProgress - 0.8) / 0.2, 0, 1)
             local targetPos = viewply:EyePos()
